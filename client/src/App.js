@@ -1,6 +1,6 @@
-import React from 'react';
-import './App.css';
-import PredictionComponent from './components/PredictionComponent';
+import React from "react";
+import "./App.css";
+import PredictionComponent from "./components/PredictionComponent";
 
 function App() {
   return (
