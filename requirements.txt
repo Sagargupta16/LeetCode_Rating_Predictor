@@ -1,3 +1,14 @@
 fastapi
-uvicorn 
-python-multipart
+uvicorn
+numpy
+pandas
+tensorflow
+scikit-learn
+joblib
+
+tensorflow
+pandas
+numpy
+requests
+scikit-learn
+joblib
