@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 import joblib
 import requests
+from fastapi.staticfiles import StaticFiles
 
 # Load the trained model and the scaler
 model = tf.keras.models.load_model('./model.keras')
@@ -90,3 +91,7 @@ async def predict(input_data: PredictionInput):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Serve the React build files from the 'static' directory
+app.mount("/", StaticFiles(directory="./client/build", html=True), name="static")

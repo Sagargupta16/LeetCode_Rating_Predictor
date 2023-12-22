@@ -9,21 +9,29 @@ const PredictionComponent = () => {
     const [rating, setRating] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [warning, setWarning] = useState(''); // Add warning state
+    const [currentPath, setCurrentPath] = useState(window.location.href); // Add currentPath state
+
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         setIsLoading(true);
         setWarning(''); // Clear previous warnings
         setPredictionResult(null); // Reset predictionResult to null
+        if (window.location.href.includes('http://localhost:3000/')) {
+            setCurrentPath('http://localhost:8000/api/predict');
+        } else {
+            setCurrentPath('https://leetcode-rating-predictor.onrender.com/api/predict');
+        }
 
         try {
             const rank = parseInt(contestRank);
             const participants = parseInt(totalParticipants);
 
+
             if (isNaN(rank) || isNaN(participants) || rank < 0 || rank > participants || participants > 50000) {
                 setWarning('Invalid input values. Rank should be between 0 and Total Participants, and Total Participants should not exceed 50,000.');
             } else {
-                const response = await fetch('http://localhost:8000/api/predict', {
+                const response = await fetch(currentPath, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
