@@ -1,8 +1,8 @@
 
-# Machine Learning Model Project for Coding Contest Analysis
+# Machine Learning Model Project for Leetcode Contest Rating Prediction
 
 ## Project Overview
-This project encompasses the development and execution of a machine learning model focused on analyzing and predicting user performances in coding contests. Utilizing Python and various libraries, it includes functionalities for data fetching, preprocessing, training, and making predictions.
+This project encompasses the development and execution of a machine learning model focused on analyzing and predicting user rating in leetcode coding contests. Utilizing Python and various libraries, it includes functionalities for data fetching, preprocessing, training, and making predictions.
 
 ## Key Libraries
 - `numpy`: For numerical computations.
