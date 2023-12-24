@@ -36,7 +36,7 @@ const PredictionComponent = () => {
     if (window.location.href.includes("localhost")) {
       setCurrentPath("http://localhost:8000");
     } else {
-      setCurrentPath("https://leetcode-rating-predictor.onrender.com/");
+      setCurrentPath("https://leetcode-rating-predictor.onrender.com");
     }
     getContests();
   }, [getContests]);
