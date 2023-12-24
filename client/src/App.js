@@ -5,7 +5,7 @@ import PredictionComponent from "./components/PredictionComponent";
 function App() {
   return (
     <div className="App">
-        <PredictionComponent />
+      <PredictionComponent />
     </div>
   );
 }
