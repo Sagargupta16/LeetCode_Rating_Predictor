@@ -203,12 +203,12 @@ async def find_latest_contest_numbers() -> tuple[int, int]:
         raise HTTPException(status_code=500, detail="Failed to fetch latest contest data")
 
 # API Routes
-@app.get("/")
+@app.get("/api")
 async def root():
     """Health check endpoint"""
     return {"message": "LeetCode Rating Predictor API is running"}
 
-@app.get("/health")
+@app.get("/api/health")
 async def health_check():
     """Detailed health check"""
     return {
