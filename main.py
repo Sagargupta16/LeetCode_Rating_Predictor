@@ -8,23 +8,89 @@ from fastapi.staticfiles import StaticFiles
 import httpx
 import asyncio
 import logging
-# Initialize logging
-logging.basicConfig(level=logging.INFO)
+from contextlib import asynccontextmanager
+from typing import List, Dict, Any
+import os
 
-app = FastAPI()
-# Global cache for contest data
-contest_data_cache = {}
+# Initialize logging with better configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Load the trained model and the scaler with error handling
-try:
-    model = tf.keras.models.load_model('./model.keras')
-    scaler = joblib.load('./scaler.save')
-except Exception as e:
-    logging.error(f"Error loading model or scaler: {e}")
-    raise e
+# Global variables
+model = None
+scaler = None
+async_client = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle - startup and shutdown events"""
+    global model, scaler, async_client
+    
+    # Startup
+    try:
+        logger.info("Loading ML model and scaler...")
+        if not os.path.exists('./model.keras'):
+            raise FileNotFoundError("Model file 'model.keras' not found")
+        if not os.path.exists('./scaler.save'):
+            raise FileNotFoundError("Scaler file 'scaler.save' not found")
+            
+        model = tf.keras.models.load_model('./model.keras')
+        scaler = joblib.load('./scaler.save')
+        async_client = httpx.AsyncClient(timeout=30.0)
+        logger.info("Successfully loaded model, scaler, and HTTP client")
+    except Exception as e:
+        logger.error(f"Failed to load model or scaler: {e}")
+        raise e
+    
+    yield
+    
+    # Shutdown
+    if async_client:
+        await async_client.aclose()
+        logger.info("HTTP client closed")
+
+app = FastAPI(
+    title="LeetCode Rating Predictor API",
+    description="Predict LeetCode contest rating changes using ML",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS middleware with more restrictive settings
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # More restrictive
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# Semaphore for controlling concurrency
+semaphore = asyncio.Semaphore(5)  # Reduced from 10 to 5
+
+# Pydantic models
+class Contest(BaseModel):
+    name: str
+    rank: int
+
+class PredictionInput(BaseModel):
+    username: str
+    contests: List[Contest]
+
+class PredictionOutput(BaseModel):
+    contest_name: str
+    prediction: float
+    rating_before_contest: float
+    rank: int
+    total_participants: int
+    rating_after_contest: float
+    attended_contests_count: int
 
 # GraphQL query for fetching user contest data
-query = """
+LEETCODE_GRAPHQL_QUERY = """
 query userContestRankingInfo($username: String!) {
     userContestRanking(username: $username) {
         attendedContestsCount
@@ -33,156 +99,218 @@ query userContestRankingInfo($username: String!) {
 }
 """
 
-# Headers for the GraphQL request
-headers = {"Content-Type": "application/json"}
+LEETCODE_GRAPHQL_URL = "https://leetcode.com/graphql"
+LEETCODE_CONTEST_API_BASE = "https://leetcode.com/contest/api/ranking"
 
-# Shared httpx.AsyncClient instance
-async_client = httpx.AsyncClient()
-
-# Semaphore for controlling concurrency
-semaphore = asyncio.Semaphore(10)
-
-# Define the PredictionInput class
-class PredictionInput(BaseModel):
-    username: str
-    contests : list
-
-# Function Definitions
-# ---------------------
-
-async def fetch_page(url):
+# Utility functions
+async def fetch_user_data(username: str) -> Dict[str, Any]:
+    """Fetch user contest data from LeetCode GraphQL API"""
     async with semaphore:
-        async with async_client.get(url) as response:
+        try:
+            response = await async_client.post(
+                LEETCODE_GRAPHQL_URL,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "query": LEETCODE_GRAPHQL_QUERY,
+                    "variables": {"username": username}
+                }
+            )
             response.raise_for_status()
-            return response.json()
-
-
-async def fetch_data(username):
-    try:
-        response = await async_client.post(
-            "https://leetcode.com/graphql",
-            headers=headers,
-            json={"query": query, "variables": {"username": username}}
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data.get("data", {}).get("userContestRanking", [])
-    except Exception as e:
-        logging.error(f"Error fetching data from LeetCode API: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-def make_prediction(input_data):
-    try:
-        input_scaled = scaler.transform(input_data)
-        input_scaled = input_scaled.reshape((input_scaled.shape[0], 1, input_scaled.shape[1]))
-        prediction = model.predict(input_scaled)
-        return float(prediction[0][0])  # Convert to standard Python float
-    except Exception as e:
-        logging.error(f"Error making prediction: {e}")
-        raise e
-
-async def update_latest_contest_data(biweekly_contest, weekly_contest):
-    try:
-        max_iterations = 100  # Example: set a maximum number of iterations
-        iteration = 0
-        while iteration < max_iterations:
-            response = await async_client.get(f'https://leetcode.com/contest/api/ranking/biweekly-contest-{biweekly_contest}/')
-            if response.json() == {}:
-                break
-            biweekly_contest += 1
-            iteration += 1
-
-        iteration = 0
-        while iteration < max_iterations:
-            response = await async_client.get(f'https://leetcode.com/contest/api/ranking/weekly-contest-{weekly_contest}/')
-            if response.json() == {}:
-                break
-            weekly_contest += 1
-            iteration += 1
-
-        return biweekly_contest - 1, weekly_contest - 1
-    except Exception as e:
-        logging.error(f"Error updating latest contest data: {e}")
-        raise e
-
-# API Endpoints
-# -------------
-
-@app.post("/api/predict")
-async def predict(input_data: PredictionInput):
-    try:
-        data = await fetch_data(input_data.username)
-        if not data or "rating" not in data or "attendedContestsCount" not in data:
-            raise ValueError("Invalid data received from fetch_data")
-
-        input1 = data["rating"]
-        input5 = data["attendedContestsCount"]
-        
-        contests = []
-
-        for contest in input_data.contests:
-            print(f"Contest: {contest}")
-            if "name" not in contest:
-                raise ValueError("Contest does not contain 'name' attribute.")
+            data = response.json()
             
-            response = await async_client.get(f'https://leetcode.com/contest/api/ranking/{contest["name"]}/')
+            user_data = data.get("data", {}).get("userContestRanking")
+            if not user_data:
+                raise ValueError(f"No contest data found for username: {username}")
+                
+            return user_data
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching user data: {e}")
+            raise HTTPException(status_code=503, detail="Failed to fetch user data from LeetCode")
+        except Exception as e:
+            logger.error(f"Error fetching user data: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
+
+async def fetch_contest_data(contest_name: str) -> Dict[str, Any]:
+    """Fetch contest ranking data from LeetCode API"""
+    async with semaphore:
+        try:
+            url = f"{LEETCODE_CONTEST_API_BASE}/{contest_name}/"
+            response = await async_client.get(url)
+            response.raise_for_status()
             contest_data = response.json()
             
-            if "rank" not in contest:
-                raise ValueError("Contest does not contain 'rank' attribute.")
-            
-            input2 = int(contest["rank"])
-            input3 = contest_data.get("user_num", 0)
-            input4 = (input2 * 100) / input3 if input3 != 0 else 0
-            prediction = make_prediction(np.array([[input1, input2, input3, input4, input5]]))
-            
-            output ={
-                "contest_name": contest["name"],
-                "prediction": prediction,
-                "rating_before_contest": input1,
-                "rank": input2,
-                "total_participants": input3,
-                "rating_after_contest": prediction,
-                "attended_contests_count": input5,
-            }
-            contests.append(output)
-            input1 = input1 + prediction
-            input5 = input5 + 1
-            
-        return contests
+            if not contest_data or contest_data == {}:
+                raise ValueError(f"No data found for contest: {contest_name}")
+                
+            return contest_data
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error fetching contest data: {e}")
+            raise HTTPException(status_code=503, detail=f"Failed to fetch contest data for {contest_name}")
+        except Exception as e:
+            logger.error(f"Error fetching contest data: {e}")
+            raise HTTPException(status_code=400, detail=str(e))
 
-    except ValueError as ve:
-        logging.error(f"Value error: {ve}")
-        raise HTTPException(status_code=400, detail=str(ve))
-
+def make_prediction(input_data: np.ndarray) -> float:
+    """Make rating prediction using the loaded ML model"""
+    try:
+        if model is None or scaler is None:
+            raise RuntimeError("Model or scaler not loaded")
+            
+        input_scaled = scaler.transform(input_data)
+        input_scaled = input_scaled.reshape((input_scaled.shape[0], 1, input_scaled.shape[1]))
+        prediction = model.predict(input_scaled, verbose=0)
+        return float(prediction[0][0])
     except Exception as e:
-        logging.error(f"Generic error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error making prediction: {e}")
+        raise HTTPException(status_code=500, detail="Failed to make prediction")
+
+async def find_latest_contest_numbers() -> tuple[int, int]:
+    """Find the latest biweekly and weekly contest numbers"""
+    try:
+        biweekly_contest = 120
+        weekly_contest = 377
+        max_iterations = 20  # Reduced from 100
+        
+        # Find latest biweekly contest
+        for _ in range(max_iterations):
+            try:
+                response = await async_client.get(
+                    f'{LEETCODE_CONTEST_API_BASE}/biweekly-contest-{biweekly_contest}/',
+                    timeout=10.0
+                )
+                if response.json() == {}:
+                    break
+                biweekly_contest += 1
+            except:
+                break
+        
+        # Find latest weekly contest
+        for _ in range(max_iterations):
+            try:
+                response = await async_client.get(
+                    f'{LEETCODE_CONTEST_API_BASE}/weekly-contest-{weekly_contest}/',
+                    timeout=10.0
+                )
+                if response.json() == {}:
+                    break
+                weekly_contest += 1
+            except:
+                break
+        
+        return biweekly_contest - 1, weekly_contest - 1
+    except Exception as e:
+        logger.error(f"Error finding latest contest numbers: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch latest contest data")
+
+# API Routes
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {"message": "LeetCode Rating Predictor API is running"}
+
+@app.get("/health")
+async def health_check():
+    """Detailed health check"""
+    return {
+        "status": "healthy",
+        "model_loaded": model is not None,
+        "scaler_loaded": scaler is not None,
+        "client_ready": async_client is not None
+    }
+
+@app.post("/api/predict", response_model=List[PredictionOutput])
+async def predict(input_data: PredictionInput):
+    """Predict rating changes for given contests"""
+    try:
+        # Validate input
+        if not input_data.username.strip():
+            raise HTTPException(status_code=400, detail="Username cannot be empty")
+        if not input_data.contests:
+            raise HTTPException(status_code=400, detail="At least one contest must be provided")
+        
+        # Fetch user data
+        user_data = await fetch_user_data(input_data.username)
+        current_rating = user_data["rating"]
+        attended_contests = user_data["attendedContestsCount"]
+        
+        results = []
+        
+        for contest in input_data.contests:
+            # Validate contest data
+            if contest.rank <= 0:
+                raise HTTPException(status_code=400, detail=f"Invalid rank for contest {contest.name}")
+            
+            # Fetch contest data
+            contest_data = await fetch_contest_data(contest.name)
+            total_participants = contest_data.get("user_num", 0)
+            
+            if total_participants == 0:
+                raise HTTPException(status_code=400, detail=f"No participants data for contest {contest.name}")
+            
+            # Calculate features
+            rank_percentage = (contest.rank * 100) / total_participants
+            features = np.array([[
+                current_rating,
+                contest.rank,
+                total_participants,
+                rank_percentage,
+                attended_contests
+            ]])
+            
+            # Make prediction
+            rating_change = make_prediction(features)
+            new_rating = current_rating + rating_change
+            
+            # Create result
+            result = PredictionOutput(
+                contest_name=contest.name,
+                prediction=rating_change,
+                rating_before_contest=current_rating,
+                rank=contest.rank,
+                total_participants=total_participants,
+                rating_after_contest=new_rating,
+                attended_contests_count=attended_contests
+            )
+            results.append(result)
+            
+            # Update for next iteration
+            current_rating = new_rating
+            attended_contests += 1
+        
+        return results
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in predict endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/contestData")
-async def contestData():
+async def get_contest_data():
+    """Get latest contest information"""
     try:
-        biweekly_contest = 120  # Ideally, these should be stored and updated in a database or file
-        weekly_contest = 377
-        biweekly_contest, weekly_contest = await update_latest_contest_data(biweekly_contest, weekly_contest)
+        biweekly_latest, weekly_latest = await find_latest_contest_numbers()
         
-        if weekly_contest%2 == 0:
-            return {"contests": [f"weekly-contest-{weekly_contest}"]}
-        else :
-            return {"contests": [f"weekly-contest-{weekly_contest}", f"biweekly-contest-{biweekly_contest}"]}     
-            
+        # Return current contests based on schedule
+        if weekly_latest % 2 == 0:
+            contests = [f"weekly-contest-{weekly_latest}"]
+        else:
+            contests = [f"weekly-contest-{weekly_latest}", f"biweekly-contest-{biweekly_latest}"]
+        
+        return {"contests": contests}
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        logging.error(f"Error in contestData: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error in contestData endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get contest data")
 
+# Serve static files (React app)
+if os.path.exists("./client/build"):
+    app.mount("/", StaticFiles(directory="./client/build", html=True), name="static")
+else:
+    logger.warning("React build directory not found. Static files will not be served.")
 
-# Serve the React build files from the 'static' directory
-app.mount("/", StaticFiles(directory="./client/build", html=True), name="static")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
