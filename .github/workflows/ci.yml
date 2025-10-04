@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  python-tests:
+    name: Run Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  python-tests:
+    name: Run Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: python -m pytest -q
+
+  name: CI
+
+  on:
+    push:
+      branches: [ main ]
+    pull_request:
+      branches: [ main ]
+    workflow_dispatch: {}
+
+  jobs:
+    python-tests:
+      name: Run Python tests
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Cache pip
+          uses: actions/cache@v4
+          with:
+            path: ~/.cache/pip
+            key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+            restore-keys: |
+              ${{ runner.os }}-pip-
+
+        - name: Set up Python
+          uses: actions/setup-python@v4
+          with:
+            python-version: '3.11'
+
+        - name: Install dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+
+        - name: Run pytest
+          run: python -m pytest -q
+
+    client-build-and-tests:
+      name: Build and test client
+      runs-on: ubuntu-latest
+      needs: python-tests
+      defaults:
+        run:
+          working-directory: ./client
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Cache Node modules
+          uses: actions/cache@v4
+          with:
+            path: |
+              ~/.npm
+              node_modules
+            key: ${{ runner.os }}-node-${{ hashFiles('client/package-lock.json') }}
+            restore-keys: |
+              ${{ runner.os }}-node-
+
+        - name: Use Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: '18'
+
+        - name: Install client dependencies
+          run: npm ci
+
+        - name: Run client tests (CI mode)
+          run: npm test -- --silent --watchAll=false
+
+        - name: Build client
+          run: npm run build
+
+    integration:
+      name: Optional integration (manual)
+      runs-on: ubuntu-latest
+      needs: [python-tests, client-build-and-tests]
+      if: github.event_name == 'workflow_dispatch'
+      steps:
+        - uses: actions/checkout@v4
+
+        - name: Cache pip
+          uses: actions/cache@v4
+          with:
+            path: ~/.cache/pip
+            key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+            restore-keys: |
+              ${{ runner.os }}-pip-
+
+        - name: Set up Python
+          uses: actions/setup-python@v4
+          with:
+            python-version: '3.11'
+
+        - name: Install full ML dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+            if [ -f requirements-ml.txt ]; then pip install -r requirements-ml.txt; fi
+
+        - name: Download model artifacts (if secrets present)
+          env:
+            MODEL_URL: ${{ secrets.MODEL_URL }}
+            SCALER_URL: ${{ secrets.SCALER_URL }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            python download_model.py || echo "download_model.py failed or no artifacts provided"
+
+        - name: Run integration tests
+          run: |
+            python -m pytest tests -q

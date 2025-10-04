@@ -7,7 +7,9 @@ const PredictionComponent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [warning, setWarning] = useState("");
   const [contests, setContests] = useState([]);
-  const [currentPath, setCurrentPath] = useState(window.location.href);
+  const [currentPath, setCurrentPath] = useState(
+    process.env.REACT_APP_API_BASE_URL || window.location.href,
+  );
 
   const getContests = useCallback(async () => {
     try {
@@ -33,10 +35,13 @@ const PredictionComponent = () => {
   }, [currentPath]);
 
   useEffect(() => {
-    if (window.location.href.includes("localhost")) {
-      setCurrentPath("http://localhost:8000");
-    } else {
-      setCurrentPath("https://leetcode-rating-predictor.onrender.com");
+    // prefer environment-configured API base URL, fallback for local dev
+    if (!process.env.REACT_APP_API_BASE_URL) {
+      if (window.location.href.includes("localhost")) {
+        setCurrentPath("http://localhost:8000");
+      } else {
+        setCurrentPath("https://leetcode-rating-predictor.onrender.com");
+      }
     }
     getContests();
   }, [getContests]);
@@ -120,7 +125,9 @@ const PredictionComponent = () => {
               value={contest.rank}
               onChange={(e) => {
                 const newContests = [...contests];
-                newContests[index].rank = e.target.value;
+                // store numeric value (or 0 if empty)
+                const v = e.target.value === "" ? 0 : Number(e.target.value);
+                newContests[index].rank = Number.isNaN(v) ? 0 : v;
                 setContests(newContests);
               }}
               disabled={!contest.include}

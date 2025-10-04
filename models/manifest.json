@@ -1,0 +1,10 @@
+{
+  "model.keras": {
+    "version": "v1",
+    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/model.keras"
+  },
+  "scaler.save": {
+    "version": "v1",
+    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/scaler.save"
+  }
+}

@@ -1,3 +1,20 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+client/node_modules/
+*.keras
+*.save
+model.keras
+scaler.save
+dist/
+build/
+.env
+.env.local
+/*.log
+/.vscode/
+/*.egg-info/
 # Python
 __pycache__/
 *.py[cod]

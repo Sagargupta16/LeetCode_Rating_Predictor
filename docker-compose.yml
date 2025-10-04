@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  backend:
+    build:
+      context: .
+      args:
+        INSTALL_ML: "0"
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - ./:/app:cached
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

@@ -1,4 +1,3 @@
-
 # 🏆 LeetCode Contest Rating Predictor
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
@@ -26,11 +25,13 @@ Predict your LeetCode contest rating changes with high accuracy using our sophis
 ### Option 1: Automated Setup (Recommended)
 
 **Windows:**
+
 ```bash
 .\setup.bat
 ```
 
 **Linux/Mac:**
+
 ```bash
 bash setup.sh
 ```
@@ -38,28 +39,32 @@ bash setup.sh
 ### Option 2: Manual Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Sagargupta16/LeetCode_Rating_Predictor.git
    cd LeetCode_Rating_Predictor
    ```
 
 2. **Set up Python environment**
+
    ```bash
    python -m venv venv
-   
+
    # Windows
    venv\Scripts\activate
-   
+
    # Linux/Mac
    source venv/bin/activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Start the server**
+
    ```bash
    python main.py
    ```
@@ -110,6 +115,7 @@ LeetCode_Rating_Predictor/
 **Endpoint:** `POST /api/predict`
 
 **Request Body:**
+
 ```json
 {
   "username": "your_leetcode_username",
@@ -127,6 +133,7 @@ LeetCode_Rating_Predictor/
 ```
 
 **Response:**
+
 ```json
 [
   {
@@ -146,6 +153,7 @@ LeetCode_Rating_Predictor/
 **Endpoint:** `GET /api/contestData`
 
 **Response:**
+
 ```json
 {
   "contests": ["weekly-contest-377", "biweekly-contest-120"]
@@ -155,8 +163,9 @@ LeetCode_Rating_Predictor/
 ## 🧠 Machine Learning Model
 
 ### Model Architecture
+
 - **Type**: LSTM (Long Short-Term Memory) Neural Network
-- **Input Features**: 
+- **Input Features**:
   - Current rating
   - Contest rank
   - Total participants
@@ -166,6 +175,7 @@ LeetCode_Rating_Predictor/
 - **Framework**: TensorFlow/Keras
 
 ### Training Process
+
 1. **Data Collection**: Automated fetching from LeetCode API
 2. **Preprocessing**: MinMaxScaler normalization
 3. **Model Training**: LSTM with optimized hyperparameters
@@ -173,13 +183,81 @@ LeetCode_Rating_Predictor/
 5. **Deployment**: Serialized model ready for production
 
 ### Performance Metrics
+
 - **Accuracy**: 85%+ on test data
 - **Mean Absolute Error**: < 15 rating points
 - **Training Data**: 10,000+ contest records
 
-## 🔧 Development
+## � Updating Training Data
+
+Keep your model fresh with the latest LeetCode data!
+
+### Quick Update
+
+```bash
+# Fetch latest contest data from LeetCode
+python update_data_simple.py
+# When prompted, enter number of users (e.g., 5000)
+```
+
+**What happens:**
+
+- Loads existing usernames from `usernames.json` (43,158 users)
+- Fetches latest contest history via GraphQL API
+- Updates `data.json` with fresh training records
+- Multi-threaded processing (~10-15 users/second)
+
+### What Gets Updated
+
+- **`data.json`**: Latest contest history and rating changes (training data)
+
+### After Updating Data
+
+1. **Retrain the model** using `LC_Contest_Rating_Predictor.ipynb`
+2. New `model.keras` and `scaler.save` will be generated
+3. **Restart the API server** to use the updated model
+
+### 🔄 Model Retraining
+
+**Quick Retraining Steps:**
+
+```bash
+# 1. Install ML dependencies (first time only)
+pip install -r requirements-ml.txt
+pip install jupyter
+
+# 2. Open the training notebook
+jupyter notebook LC_Contest_Rating_Predictor.ipynb
+
+# 3. Run all cells (Cell → Run All)
+# ⏱️ Wait 5-15 minutes for training to complete
+
+# 4. Restart the API server
+# Press Ctrl+C in the terminal running the server, then:
+uvicorn main:app --reload
+```
+
+**What happens during retraining:**
+
+- Loads `data.json` (your updated training data)
+- Preprocesses and normalizes features with MinMaxScaler
+- Trains LSTM neural network (50 units, ~100 epochs with early stopping)
+- Saves `model.keras` (trained model) and `scaler.save` (feature scaler)
+
+**📚 Complete Retraining Guide:** [MODEL_RETRAINING_GUIDE.md](MODEL_RETRAINING_GUIDE.md)
+
+The complete guide includes:
+
+- Detailed cell-by-cell walkthrough
+- Model architecture explanation
+- Performance evaluation metrics
+- Troubleshooting common issues
+- Advanced training options
+
+## �🔧 Development
 
 ### Prerequisites
+
 - Python 3.8+
 - Node.js 14+ (for frontend)
 - Git
@@ -187,15 +265,17 @@ LeetCode_Rating_Predictor/
 ### Local Development Setup
 
 1. **Backend Development**
+
    ```bash
    # Install development dependencies
    pip install -r requirements.txt
-   
+
    # Run with auto-reload
    uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 2. **Frontend Development**
+
    ```bash
    cd client
    npm install
@@ -209,13 +289,98 @@ LeetCode_Rating_Predictor/
    ```
 
 ### Testing
+
 ```bash
 # Backend tests (if available)
 python -m pytest tests/
+```
+
+### Developer notes
+
+- Frontend API base URL: set `REACT_APP_API_BASE_URL` in `client/.env` or your system env to point the React app to the backend (default: `http://localhost:8000`).
+- To run backend tests locally:
+
+```powershell
+python -m pytest -q
+```
+
+If you run into missing model files during local development, either download the model artifacts to `./model.keras` and `./scaler.save` or run tests which mock these artifacts.
+
+## Advanced developer notes
+
+- Downloading model artifacts:
+
+  - The repository includes `download_model.py` and `models/manifest.json` (placeholder). To download artifacts locally:
+
+    ```powershell
+    python download_model.py
+    ```
+
+  - You can override URLs with environment variables:
+
+    ```powershell
+    $env:MODEL_URL = 'https://.../model.keras'
+    $env:SCALER_URL = 'https://.../scaler.save'
+    python download_model.py
+    ```
+
+  - The script also supports a GitHub shorthand of the form:
+
+    gh:owner/repo/releases/tag/<tag>/<asset_name>
+
+    Example (requires `GITHUB_TOKEN` if the repo is private):
+
+    ```powershell
+    python download_model.py
+    # or
+    $env:MODEL_URL = 'gh:owner/repo/releases/tag/v1/model.keras'
+    $env:SCALER_URL = 'gh:owner/repo/releases/tag/v1/scaler.save'
+    python download_model.py
+    ```
+
+- Docker build with ML dependencies (optional):
+
+  The `Dockerfile` accepts a build-arg `INSTALL_ML`. By default heavy ML deps are NOT installed. To include them:
+
+  ```powershell
+  docker build --build-arg INSTALL_ML=1 -t myimage:latest .
+  ```
+
+- Redis cache (optional):
+
+  - The backend uses an in-memory TTL cache by default. To use Redis in production, set `REDIS_URL` in the environment (e.g., `redis://user:pass@host:6379/0`). The app will automatically use Redis when `REDIS_URL` is present.
+
+- Integration CI job (manual):
+
+  - A manual `integration` job is available in the GitHub Actions `CI` workflow. Trigger it from the Actions UI (workflow_dispatch). It will install ML dependencies (`requirements-ml.txt`), attempt to download model artifacts via `download_model.py`, and run integration tests.
+
+- Pre-commit hooks:
+
+  - Install dev tools and enable hooks:
+
+    ```powershell
+    pip install -r requirements-dev.txt
+    pre-commit install
+    ```
+
+  Docker Compose (local Redis)
+
+  ***
+
+  To run the backend locally with Redis for caching, use docker-compose:
+
+  ```powershell
+  docker compose up --build
+  # then open http://localhost:8000
+  ```
+
+  This will run Redis (available at `redis://localhost:6379`) and the backend connected to it via `REDIS_URL`.
 
 # Frontend tests
+
 cd client && npm test
-```
+
+````
 
 ## 🌐 Deployment
 
@@ -226,7 +391,7 @@ cd client && npm test
    cd client
    npm run build
    cd ..
-   ```
+````
 
 2. **Run production server**
    ```bash
@@ -234,6 +399,7 @@ cd client && npm test
    ```
 
 ### Docker Deployment (Optional)
+
 ```dockerfile
 # Example Dockerfile structure
 FROM python:3.9-slim
@@ -250,6 +416,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Quick Contribution Steps
+
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Commit changes: `git commit -m 'Add amazing feature'`
