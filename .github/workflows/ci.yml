@@ -12,7 +12,7 @@ jobs:
     name: Run Python tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 name: CI
 
 on:
@@ -27,7 +27,7 @@ jobs:
     name: Run Python tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -64,7 +64,7 @@ jobs:
       name: Run Python tests
       runs-on: ubuntu-latest
       steps:
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v5
 
         - name: Cache pip
           uses: actions/cache@v4
@@ -95,7 +95,7 @@ jobs:
         run:
           working-directory: ./client
       steps:
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v5
 
         - name: Cache Node modules
           uses: actions/cache@v4
@@ -127,7 +127,7 @@ jobs:
       needs: [python-tests, client-build-and-tests]
       if: github.event_name == 'workflow_dispatch'
       steps:
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v5
 
         - name: Cache pip
           uses: actions/cache@v4
