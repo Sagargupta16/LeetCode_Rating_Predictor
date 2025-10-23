@@ -38,6 +38,6 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "msw": "^1.2.1"
+    "msw": "^2.0.0"
   }
 }
