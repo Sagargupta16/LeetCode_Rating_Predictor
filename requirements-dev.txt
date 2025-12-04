@@ -1,5 +1,5 @@
 # Dev tools for linting and formatting
 black==25.11.0
-ruff==0.14.7
+ruff==0.14.8
 isort==5.13.2
 pre-commit==3.8.0
