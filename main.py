@@ -129,7 +129,9 @@ async def health_check():
 async def predict(input_data: PredictionInput):
     """Predict rating changes for given contests."""
     try:
-        user_data = await fetch_user_data(async_client, semaphore, cache, input_data.username)
+        user_data = await fetch_user_data(
+            async_client, semaphore, cache, input_data.username
+        )
 
         current_rating = user_data.get("rating")
         attended_contests = user_data.get("attendedContestsCount")
@@ -166,16 +168,25 @@ async def predict(input_data: PredictionInput):
             log_rank = float(np.log1p(contest.rank))
             rating_x_pct = current_rating * (contest.rank / total_participants)
             features = np.array(
-                [[
-                    current_rating, contest.rank, total_participants,  # f1-f3
-                    rank_percentage, attended_contests,                 # f4-f5
-                    avg_solve_rate, avg_finish_time,                    # f6-f7
-                    recent_solve_rate, recent_finish_time,             # f8-f9
-                    rating_trend, max_rating,                          # f10-f11
-                    log_rank, rating_x_pct,                            # f12-f13
-                    avg_solve_rate * current_rating,                   # f14
-                    avg_finish_time / 5400,                            # f15
-                ]]
+                [
+                    [
+                        current_rating,
+                        contest.rank,
+                        total_participants,  # f1-f3
+                        rank_percentage,
+                        attended_contests,  # f4-f5
+                        avg_solve_rate,
+                        avg_finish_time,  # f6-f7
+                        recent_solve_rate,
+                        recent_finish_time,  # f8-f9
+                        rating_trend,
+                        max_rating,  # f10-f11
+                        log_rank,
+                        rating_x_pct,  # f12-f13
+                        avg_solve_rate * current_rating,  # f14
+                        avg_finish_time / 5400,  # f15
+                    ]
+                ]
             )
 
             rating_change = make_prediction(model, scaler, features)
@@ -202,7 +213,7 @@ async def predict(input_data: PredictionInput):
         raise
     except Exception as e:
         logger.error(f"Unexpected error in predict endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @app.get("/api/contestData")
@@ -215,7 +226,7 @@ async def get_contest_data():
         raise
     except Exception as e:
         logger.error(f"Error in contestData endpoint: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get contest data")
+        raise HTTPException(status_code=500, detail="Failed to get contest data") from e
 
 
 # ---------------------------------------------------------------------------

@@ -101,7 +101,8 @@ def main():
 
     if not model_url or not scaler_url:
         print(
-            "Model or scaler URL not provided. Set MODEL_URL/SCALER_URL or update models/manifest.json"
+            "Model or scaler URL not provided. "
+            "Set MODEL_URL/SCALER_URL or update models/manifest.json"
         )
         sys.exit(1)
 

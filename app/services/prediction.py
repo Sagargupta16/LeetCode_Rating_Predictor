@@ -32,4 +32,4 @@ def make_prediction(model, scaler, input_data: np.ndarray) -> float:
         return float(prediction[0][0])
     except Exception as e:
         logger.error(f"Error making prediction: {e}")
-        raise HTTPException(status_code=500, detail="Failed to make prediction")
+        raise HTTPException(status_code=500, detail="Failed to make prediction") from e

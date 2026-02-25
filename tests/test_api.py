@@ -64,9 +64,7 @@ def test_predict_empty_contests():
     """Valid username with empty contests still tries to fetch user data.
     With the dummy client that has no .post, it returns 503."""
     client = TestClient(app_module.app)
-    r = client.post(
-        "/api/predict", json={"username": "testuser", "contests": []}
-    )
+    r = client.post("/api/predict", json={"username": "testuser", "contests": []})
     assert r.status_code == 503
 
 

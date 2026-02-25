@@ -9,7 +9,7 @@ data = {
 }
 
 try:
-    response = requests.post(url, json=data)
+    response = requests.post(url, json=data, timeout=15)
     response.raise_for_status()
     results = response.json()
     for r in results:

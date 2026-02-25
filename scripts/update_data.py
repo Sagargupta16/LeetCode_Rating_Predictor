@@ -89,11 +89,17 @@ def _build_record(rating, rank, idx, solve_rates, finish_times, ratings):
     max_r = max(ratings) if ratings else 1500
 
     return {
-        "f1": rating, "f2": rank, "f3": total_participants,
-        "f4": round(percentile * 100, 4), "f5": idx,
-        "f6": round(avg_sr, 4), "f7": round(avg_ft, 1),
-        "f8": round(recent_sr, 4), "f9": round(recent_ft, 1),
-        "f10": round(trend, 4), "f11": round(max_r, 3),
+        "f1": rating,
+        "f2": rank,
+        "f3": total_participants,
+        "f4": round(percentile * 100, 4),
+        "f5": idx,
+        "f6": round(avg_sr, 4),
+        "f7": round(avg_ft, 1),
+        "f8": round(recent_sr, 4),
+        "f9": round(recent_ft, 1),
+        "f10": round(trend, 4),
+        "f11": round(max_r, 3),
         "f12": round(math.log1p(rank), 4),
         "f13": round(rating * percentile, 4),
         "f14": round(avg_sr * rating, 4),
@@ -169,7 +175,7 @@ def main():
         {
             "Content-Type": "application/json",
             "Referer": "https://leetcode.com/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         }
     )
 

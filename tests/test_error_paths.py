@@ -100,7 +100,9 @@ def test_fetch_user_data_http_error():
 
     with pytest.raises(Exception):
         asyncio.run(
-            fetch_user_data(DummyClient(), asyncio.Semaphore(5), TTLCache(), "nonexistent")
+            fetch_user_data(
+                DummyClient(), asyncio.Semaphore(5), TTLCache(), "nonexistent"
+            )
         )
 
 
@@ -113,7 +115,9 @@ def test_fetch_contest_data_invalid_name():
 
     with pytest.raises(Exception):
         asyncio.run(
-            fetch_contest_data(DummyClient(), asyncio.Semaphore(5), TTLCache(), "invalid-name")
+            fetch_contest_data(
+                DummyClient(), asyncio.Semaphore(5), TTLCache(), "invalid-name"
+            )
         )
 
 

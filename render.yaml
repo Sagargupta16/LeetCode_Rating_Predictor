@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: leetcode-rating-predictor
+    runtime: python
+    buildCommand: >
+      pip install -r requirements.txt &&
+      pip install -r requirements-ml.txt &&
+      cd client && npm ci && npm run build
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.6"
+      - key: NODE_VERSION
+        value: "20"

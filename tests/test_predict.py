@@ -58,7 +58,11 @@ def test_make_prediction_scaler_error():
             return np.array([[0.0]])
 
     with pytest.raises(HTTPException) as exc_info:
-        make_prediction(DummyModel(), BadScaler(), np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]]))
+        make_prediction(
+            DummyModel(),
+            BadScaler(),
+            np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]]),
+        )
     assert exc_info.value.status_code == 500
 
 

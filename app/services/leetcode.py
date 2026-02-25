@@ -134,13 +134,13 @@ async def fetch_user_data(
             raise HTTPException(
                 status_code=503,
                 detail="Failed to fetch user data from LeetCode",
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Error fetching user data: {e}")
             raise HTTPException(
                 status_code=503,
                 detail="Failed to fetch user data from LeetCode",
-            )
+            ) from e
 
 
 async def fetch_contest_data(
@@ -192,13 +192,13 @@ async def fetch_contest_data(
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to fetch contest data for {contest_name}",
-            )
+            ) from e
         except Exception as e:
             logger.error(f"Error fetching contest data: {e}")
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to fetch contest data for {contest_name}",
-            )
+            ) from e
 
 
 async def find_latest_contests(
@@ -239,4 +239,4 @@ async def find_latest_contests(
         logger.error(f"Error finding latest contests: {e}")
         raise HTTPException(
             status_code=500, detail="Failed to fetch latest contest data"
-        )
+        ) from e
