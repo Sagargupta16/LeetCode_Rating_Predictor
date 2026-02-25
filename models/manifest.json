@@ -1,10 +1,14 @@
 {
   "model.keras": {
     "version": "v1",
-    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/model.keras"
+    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/model.keras",
+    "sha256": "",
+    "format": "keras"
   },
   "scaler.save": {
     "version": "v1",
-    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/scaler.save"
+    "url": "https://example.com/your-org/LeetCode_Rating_Predictor/scaler.save",
+    "sha256": "",
+    "format": "joblib"
   }
 }

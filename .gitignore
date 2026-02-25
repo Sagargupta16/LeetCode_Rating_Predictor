@@ -1,29 +1,10 @@
-venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-node_modules/
-client/node_modules/
-*.keras
-*.save
-model.keras
-scaler.save
-dist/
-build/
-.env
-.env.local
-/*.log
-/.vscode/
-/*.egg-info/
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -41,7 +22,6 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
-.env
 .venv
 env/
 venv/
@@ -70,16 +50,20 @@ Thumbs.db
 logs/
 
 # Node.js (for React frontend)
-client/node_modules
+node_modules/
+client/node_modules/
 client/npm-debug.log*
 client/yarn-debug.log*
 client/yarn-error.log*
 
 # Build artifacts
+build/
+dist/
 client/build/
 client/dist/
 
 # Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -94,6 +78,10 @@ htmlcov/
 nosetests.xml
 coverage.xml
 
-# ML model files (keep tracked but ignore temporary ones)
+# ML temporary files
 *.tmp
 model_backup/
+
+# Claude Code
+CLAUDE.md
+.claude/

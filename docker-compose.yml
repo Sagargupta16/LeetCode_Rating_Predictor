@@ -13,8 +13,15 @@ services:
       - redis
     volumes:
       - ./:/app:cached
+    restart: unless-stopped
 
   redis:
-    image: redis:8-alpine
+    image: redis:8.0-alpine
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M

@@ -1,5 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./PredictionComponent.css";
+
+function getApiBaseUrl() {
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+  if (typeof window !== "undefined" && window.location.href.includes("localhost")) {
+    return "http://localhost:8000";
+  }
+  return "https://leetcode-rating-predictor.onrender.com";
+}
 
 const PredictionComponent = () => {
   const [username, setUsername] = useState("");
@@ -7,157 +17,164 @@ const PredictionComponent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [warning, setWarning] = useState("");
   const [contests, setContests] = useState([]);
-  const [currentPath, setCurrentPath] = useState(
-    process.env.REACT_APP_API_BASE_URL || window.location.href,
-  );
-
-  const getContests = useCallback(async () => {
-    try {
-      const response = await fetch(`${currentPath}/api/contestData`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      } else {
-        const data = await response.json();
-        const initializedContests = data.contests.map((contest) => ({
-          name: contest,
-          rank: 0,
-          include: false,
-        }));
-        setContests(initializedContests);
-      }
-    } catch (error) {
-      console.error("There was a problem with the fetch operation:", error);
-    }
-  }, [currentPath]);
+  const apiBaseUrl = useRef(getApiBaseUrl());
 
   useEffect(() => {
-    // prefer environment-configured API base URL, fallback for local dev
-    if (!process.env.REACT_APP_API_BASE_URL) {
-      if (window.location.href.includes("localhost")) {
-        setCurrentPath("http://localhost:8000");
-      } else {
-        setCurrentPath("https://leetcode-rating-predictor.onrender.com");
+    const fetchContests = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl.current}/api/contestData`, {
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        setContests(data.contests.map((name) => ({ name, rank: 0, include: false })));
+      } catch (err) {
+        console.error("Failed to load contests:", err);
       }
-    }
-    getContests();
-  }, [getContests]);
+    };
+    fetchContests();
+  }, []);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    if (!username.trim()) {
-      setWarning("Please enter a valid username.");
-      return;
-    }
+  const toggle = (i, checked) =>
+    setContests((p) => p.map((c, j) => (j === i ? { ...c, include: checked, rank: 0 } : c)));
 
-    const selectedContests = contests.filter(
-      (contest) => contest.include && contest.rank > 0,
-    );
-    if (selectedContests.length === 0) {
-      setWarning("Please select at least one contest and enter your rank.");
-      return;
-    }
+  const setRank = (i, val) => {
+    const v = val === "" ? 0 : Number(val);
+    setContests((p) => p.map((c, j) => (j === i ? { ...c, rank: Number.isNaN(v) ? 0 : v } : c)));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!username.trim()) return setWarning("Please enter a valid username.");
+
+    const selected = contests.filter((c) => c.include && c.rank > 0);
+    if (!selected.length) return setWarning("Please select at least one contest and enter your rank.");
 
     setIsLoading(true);
     setWarning("");
     setPredictionResults([]);
 
     try {
-      const response = await fetch(`${currentPath}/api/predict`, {
+      const res = await fetch(`${apiBaseUrl.current}/api/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, contests: selectedContests }),
+        body: JSON.stringify({ username, contests: selected }),
       });
 
-      if (!response.ok) {
-        if (response.status === 400) {
-          setWarning("Username does not exist or invalid data.");
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+      if (!res.ok) {
+        const msgs = { 400: "Username does not exist or invalid data.", 503: "LeetCode API is temporarily unavailable. Try again later." };
+        setWarning(msgs[res.status] || `Request failed with status ${res.status}.`);
       } else {
-        const data = await response.json();
-        setPredictionResults(data);
+        setPredictionResults(await res.json());
       }
-    } catch (error) {
-      console.error("There was a problem with the fetch operation:", error);
+    } catch {
+      setWarning("Network error. Please check your connection.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="PredictionComponent">
-      <h1>Leetcode Rating Predictor</h1>
-      <form onSubmit={handleSubmit} className="prediction-form">
-        <div className="input-container">
-          <div className="input-title">Enter Your Username</div>
+    <div className="glass-card">
+      <h1 className="title">Leetcode Rating Predictor</h1>
+
+      <form onSubmit={handleSubmit} className="form">
+        {/* Username */}
+        <div className="field">
+          <label htmlFor="username-input" className="label">Enter Your Username</label>
           <input
+            id="username-input"
             type="text"
+            className="input"
+            placeholder="e.g. tourist"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            aria-required="true"
           />
         </div>
-        {contests.map((contest, index) => (
-          <div key={index} className="contest-input">
-            <div className="checkbox-container">
+
+        {/* Contests */}
+        {contests.map((contest, i) => (
+          <div key={contest.name} className="contest-card">
+            <div className="check-row">
               <input
                 type="checkbox"
+                id={`contest-${contest.name}`}
+                className="checkbox"
                 checked={contest.include}
-                onChange={(e) => {
-                  const newContests = [...contests];
-                  newContests[index].include = e.target.checked;
-                  newContests[index].rank = 0; // Reset rank if unchecked
-                  setContests(newContests);
-                }}
+                onChange={(e) => toggle(i, e.target.checked)}
               />
-              <div className="input-title">
+              <label htmlFor={`contest-${contest.name}`} className="input-title">
                 Participated in {contest.name} ?
-              </div>
+              </label>
             </div>
-            <div className="input-title">Your Rank in {contest.name}</div>
+            <label htmlFor={`rank-${contest.name}`} className="label">
+              Your Rank in {contest.name}
+            </label>
             <input
+              id={`rank-${contest.name}`}
               type="number"
+              className="input"
               min="1"
+              placeholder="Enter rank"
               value={contest.rank}
-              onChange={(e) => {
-                const newContests = [...contests];
-                // store numeric value (or 0 if empty)
-                const v = e.target.value === "" ? 0 : Number(e.target.value);
-                newContests[index].rank = Number.isNaN(v) ? 0 : v;
-                setContests(newContests);
-              }}
+              onChange={(e) => setRank(i, e.target.value)}
               disabled={!contest.include}
+              aria-label={`Rank in ${contest.name}`}
             />
           </div>
         ))}
-        <button type="submit" disabled={isLoading}>
-          Predict
+
+        <button type="submit" className="btn" disabled={isLoading} aria-busy={isLoading}>
+          {isLoading ? "Predicting..." : "Predict"}
         </button>
       </form>
-      <div className="prediction-info">
-        {isLoading ? (
-          <div className="loader">Loading...</div>
-        ) : (
-          predictionResults.map((result, index) => (
-            <div key={index} className="prediction-output">
-              <p>Contest: {result.contest_name}</p>
-              <p>Your Rank: {result.rank}</p>
-              <p>Total Participants: {result.total_participants}</p>
-              <p>Rating Before Contest: {result.rating_before_contest}</p>
-              <p>Rating Change: {result.rating_after_contest}</p>
-              <p>
-                Rating After Contest:{" "}
-                {result.rating_before_contest + result.rating_after_contest}
-              </p>
-              <p>Attended Contests Count: {result.attended_contests_count}</p>
-            </div>
-          ))
+
+      {/* Results */}
+      <div className="results" role="region" aria-live="polite">
+        {isLoading && (
+          <div className="spinner-wrap" role="status">
+            <div className="spinner" />
+            <span>Loading predictions...</span>
+          </div>
         )}
-        {warning && <p className="warning">{warning}</p>}
+
+        {predictionResults.map((r) => (
+          <div key={r.contest_name} className="result-card">
+            <h3>{r.contest_name}</h3>
+            <div className="result-grid">
+              <div className="stat">
+                <span className="stat-label">Rank</span>
+                <span className="stat-value">{r.rank}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Participants</span>
+                <span className="stat-value">{r.total_participants.toLocaleString()}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Before</span>
+                <span className="stat-value">{r.rating_before_contest}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Change</span>
+                <span className={`stat-value ${r.prediction >= 0 ? "positive" : "negative"}`}>
+                  {r.prediction >= 0 ? "+" : ""}
+                  {r.prediction.toFixed(2)}
+                </span>
+              </div>
+              <div className="stat highlight">
+                <span className="stat-label">After</span>
+                <span className="stat-value">{r.rating_after_contest.toFixed(2)}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Contests</span>
+                <span className="stat-value">{r.attended_contests_count}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {warning && <p className="warning" role="alert">{warning}</p>}
       </div>
     </div>
   );

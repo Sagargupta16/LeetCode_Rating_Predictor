@@ -8,11 +8,14 @@ Usage:
 """
 
 import json
-import requests
+import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+import requests
 from tqdm import tqdm
-import logging
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -45,9 +48,14 @@ def fetch_user_contest_history(session, username):
         )
         if response.status_code == 200:
             data = response.json()
-            return data.get("data", {}).get("userContestRankingHistory", [])
-    except Exception as e:
-        logger.debug(f"Error fetching {username}: {e}")
+            history = data.get("data", {}).get("userContestRankingHistory", [])
+            if history is None:
+                return []
+            return history
+    except requests.exceptions.RequestException as e:
+        logger.debug(f"Network error fetching {username}: {e}")
+    except (ValueError, KeyError) as e:
+        logger.debug(f"Parse error fetching {username}: {e}")
     return []
 
 
@@ -61,26 +69,30 @@ def process_user_data(username, session):
     rating = 1500.0
 
     for idx, contest in enumerate(contests):
-        if contest.get("attended"):
-            new_rating = contest.get("rating", rating)
-            rank = contest.get("ranking", 0)
+        if not contest.get("attended"):
+            continue
 
-            # Estimate total participants based on rank
-            total_participants = max(rank * 1.5, 10000)
-            percentile = (rank / total_participants) if total_participants > 0 else 0
-            rating_change = new_rating - rating
+        new_rating = contest.get("rating")
+        rank = contest.get("ranking")
+        if new_rating is None or rank is None or rank <= 0:
+            continue
 
-            record = {
-                "input1": rating,
-                "input2": rank,
-                "input3": int(total_participants),
-                "input4": percentile,
-                "input5": idx,
-                "output": rating_change,
-            }
+        # Estimate total participants based on rank
+        total_participants = max(int(rank * 1.5), 10000)
+        percentile = rank / total_participants
+        rating_change = new_rating - rating
 
-            data.append(record)
-            rating = new_rating
+        record = {
+            "input1": rating,
+            "input2": rank,
+            "input3": total_participants,
+            "input4": percentile,
+            "input5": idx,
+            "output": rating_change,
+        }
+
+        data.append(record)
+        rating = new_rating
 
     return data
 
@@ -91,13 +103,15 @@ def main():
     logger.info("=" * 60)
 
     # Load existing usernames
+    data_dir = Path(__file__).parent.parent / "data"
+    usernames_path = data_dir / "usernames.json"
     try:
-        with open("usernames.json", "r") as f:
+        with open(usernames_path, "r") as f:
             usernames = json.load(f)
-        logger.info(f"Loaded {len(usernames)} usernames from usernames.json")
+        logger.info(f"Loaded {len(usernames)} usernames from {usernames_path}")
     except FileNotFoundError:
-        logger.error("usernames.json not found!")
-        logger.info("Please ensure usernames.json exists in the current directory")
+        logger.error(f"{usernames_path} not found!")
+        logger.info("Please ensure data/usernames.json exists")
         return
 
     # Ask how many users to process
@@ -107,7 +121,8 @@ def main():
             f"How many users to process? (default: min(5000, {len(usernames)})): "
         ).strip()
         num_users = int(num_users) if num_users else min(5000, len(usernames))
-    except:
+        num_users = max(1, min(num_users, len(usernames)))
+    except (ValueError, EOFError):
         num_users = min(5000, len(usernames))
 
     usernames = usernames[:num_users]
@@ -122,8 +137,9 @@ def main():
         }
     )
 
-    # Process users
+    # Process users with thread-safe data collection
     all_data = []
+    data_lock = threading.Lock()
     successful = 0
     failed = 0
 
@@ -138,7 +154,8 @@ def main():
                 try:
                     user_data = future.result()
                     if user_data:
-                        all_data.extend(user_data)
+                        with data_lock:
+                            all_data.extend(user_data)
                         successful += 1
                     else:
                         failed += 1
@@ -155,12 +172,12 @@ def main():
     logger.info(f"Total training records: {len(all_data)}")
 
     # Save to file
-    output_file = "data.json"
+    output_file = data_dir / "data.json"
     with open(output_file, "w") as f:
         for record in all_data:
             f.write(json.dumps(record) + "\n")
 
-    logger.info(f"\n✅ Training data saved to {output_file}")
+    logger.info(f"\nTraining data saved to {output_file}")
     logger.info("=" * 60)
     logger.info("Update complete!")
     logger.info("=" * 60)

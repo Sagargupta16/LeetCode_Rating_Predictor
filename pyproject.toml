@@ -6,4 +6,10 @@ profile = "black"
 
 [tool.ruff]
 line-length = 88
+target-version = "py311"
 select = ["E", "F", "W", "C", "N", "B", "S"]
+exclude = ["venv", "__pycache__", "client"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
