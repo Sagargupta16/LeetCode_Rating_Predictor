@@ -81,7 +81,9 @@ coverage.xml
 # ML temporary files
 *.tmp
 model_backup/
+models/history/
 
 # Claude Code
 CLAUDE.md
-.claude/
+.claude
+.claude/*

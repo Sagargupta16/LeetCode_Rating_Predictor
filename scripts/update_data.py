@@ -1,10 +1,10 @@
 """
-Simple LeetCode Training Data Updater
-======================================
-Updates training data by fetching latest contest history for existing usernames.
+LeetCode Training Data Updater
+===============================
+Fetches contest history with solve rate and finish time for training.
 
 Usage:
-    python update_data_simple.py
+    python scripts/update_data.py
 """
 
 import json
@@ -29,6 +29,9 @@ query userContestRankingInfo($username: String!) {
         attended
         rating
         ranking
+        problemsSolved
+        totalProblems
+        finishTimeInSeconds
         contest {
             title
             startTime
@@ -39,7 +42,7 @@ query userContestRankingInfo($username: String!) {
 
 
 def fetch_user_contest_history(session, username):
-    """Fetch contest history for a user"""
+    """Fetch contest history for a user."""
     try:
         response = session.post(
             LEETCODE_GRAPHQL_URL,
@@ -59,40 +62,75 @@ def fetch_user_contest_history(session, username):
     return []
 
 
+def _rolling_avg(values, default):
+    """Return the mean of non-empty values, or default."""
+    return sum(values) / len(values) if values else default
+
+
+def _rolling_avg_positive(values, default):
+    """Return the mean of positive values, or default."""
+    pos = [v for v in values if v > 0]
+    return sum(pos) / len(pos) if pos else default
+
+
+def _build_record(rating, rank, idx, solve_rates, finish_times, ratings):
+    """Build a single 15-feature training record."""
+    import math
+
+    total_participants = max(int(rank * 1.5), 10000)
+    percentile = rank / total_participants
+
+    avg_sr = _rolling_avg(solve_rates, 0.5)
+    avg_ft = _rolling_avg_positive(finish_times, 3000)
+    recent_sr = _rolling_avg(solve_rates[-5:], 0.5) if solve_rates else 0.5
+    recent_ft = _rolling_avg_positive(finish_times[-5:], 3000)
+    changes = [ratings[j] - ratings[j - 1] for j in range(1, len(ratings))]
+    trend = _rolling_avg(changes[-5:], 0) if changes else 0
+    max_r = max(ratings) if ratings else 1500
+
+    return {
+        "f1": rating, "f2": rank, "f3": total_participants,
+        "f4": round(percentile * 100, 4), "f5": idx,
+        "f6": round(avg_sr, 4), "f7": round(avg_ft, 1),
+        "f8": round(recent_sr, 4), "f9": round(recent_ft, 1),
+        "f10": round(trend, 4), "f11": round(max_r, 3),
+        "f12": round(math.log1p(rank), 4),
+        "f13": round(rating * percentile, 4),
+        "f14": round(avg_sr * rating, 4),
+        "f15": round(avg_ft / 5400, 4),
+    }
+
+
 def process_user_data(username, session):
-    """Process a user's contest history into training data"""
+    """Process a user's contest history into training records (15 features + output)."""
     contests = fetch_user_contest_history(session, username)
     if not contests:
         return []
 
     data = []
     rating = 1500.0
+    solve_rates, finish_times, ratings = [], [], []
 
     for idx, contest in enumerate(contests):
         if not contest.get("attended"):
             continue
-
         new_rating = contest.get("rating")
         rank = contest.get("ranking")
         if new_rating is None or rank is None or rank <= 0:
             continue
 
-        # Estimate total participants based on rank
-        total_participants = max(int(rank * 1.5), 10000)
-        percentile = rank / total_participants
-        rating_change = new_rating - rating
+        solved = contest.get("problemsSolved", 0) or 0
+        total_probs = contest.get("totalProblems", 4) or 4
+        ft = contest.get("finishTimeInSeconds", 0) or 0
 
-        record = {
-            "input1": rating,
-            "input2": rank,
-            "input3": total_participants,
-            "input4": percentile,
-            "input5": idx,
-            "output": rating_change,
-        }
-
+        record = _build_record(rating, rank, idx, solve_rates, finish_times, ratings)
+        record["output"] = round(new_rating - rating, 4)
         data.append(record)
+
         rating = new_rating
+        ratings.append(new_rating)
+        solve_rates.append(solved / total_probs if total_probs > 0 else 0)
+        finish_times.append(ft)
 
     return data
 
@@ -102,7 +140,6 @@ def main():
     logger.info("LeetCode Training Data Update")
     logger.info("=" * 60)
 
-    # Load existing usernames
     data_dir = Path(__file__).parent.parent / "data"
     usernames_path = data_dir / "usernames.json"
     try:
@@ -114,7 +151,6 @@ def main():
         logger.info("Please ensure data/usernames.json exists")
         return
 
-    # Ask how many users to process
     print(f"\nTotal usernames available: {len(usernames)}")
     try:
         num_users = input(
@@ -128,16 +164,15 @@ def main():
     usernames = usernames[:num_users]
     logger.info(f"\nProcessing {len(usernames)} users...")
 
-    # Setup session
     session = requests.Session()
     session.headers.update(
         {
             "Content-Type": "application/json",
+            "Referer": "https://leetcode.com/",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
     )
 
-    # Process users with thread-safe data collection
     all_data = []
     data_lock = threading.Lock()
     successful = 0
@@ -165,13 +200,12 @@ def main():
                 finally:
                     pbar.update(1)
 
-                time.sleep(0.05)  # Rate limiting
+                time.sleep(0.05)
 
     logger.info(f"\nSuccessfully processed: {successful}")
     logger.info(f"Failed/No data: {failed}")
     logger.info(f"Total training records: {len(all_data)}")
 
-    # Save to file
     output_file = data_dir / "data.json"
     with open(output_file, "w") as f:
         for record in all_data:
@@ -179,12 +213,6 @@ def main():
 
     logger.info(f"\nTraining data saved to {output_file}")
     logger.info("=" * 60)
-    logger.info("Update complete!")
-    logger.info("=" * 60)
-    logger.info("\nNext steps:")
-    logger.info("1. Open LC_Contest_Rating_Predictor.ipynb")
-    logger.info("2. Run all cells to retrain the model")
-    logger.info("3. Restart your API server")
 
 
 if __name__ == "__main__":

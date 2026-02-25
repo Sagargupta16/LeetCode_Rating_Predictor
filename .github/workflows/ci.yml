@@ -128,7 +128,7 @@ jobs:
           SCALER_URL: ${{ secrets.SCALER_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python download_model.py || echo "download_model.py failed or no artifacts provided"
+          python scripts/download_model.py || echo "download_model.py failed or no artifacts provided"
 
       - name: Run integration tests
         run: |

@@ -42,12 +42,12 @@
 .label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #a0a0b8;
+  color: #b8b8d0;
 }
 
 .input-title {
   font-size: 0.95rem;
-  color: #c0c0d4;
+  color: #d0d0e0;
   cursor: pointer;
 }
 
@@ -65,7 +65,7 @@
 }
 
 .input::placeholder {
-  color: #555570;
+  color: #8888a0;
 }
 
 .input:focus {
@@ -227,7 +227,7 @@
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #707088;
+  color: #9090a8;
   margin-bottom: 0.25rem;
 }
 

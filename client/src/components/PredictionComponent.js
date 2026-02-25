@@ -5,7 +5,7 @@ function getApiBaseUrl() {
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
-  if (typeof window !== "undefined" && window.location.href.includes("localhost")) {
+  if (typeof globalThis.window !== "undefined" && globalThis.window.location.href.includes("localhost")) {
     return "http://localhost:8000";
   }
   return "https://leetcode-rating-predictor.onrender.com";
@@ -48,7 +48,7 @@ const PredictionComponent = () => {
     if (!username.trim()) return setWarning("Please enter a valid username.");
 
     const selected = contests.filter((c) => c.include && c.rank > 0);
-    if (!selected.length) return setWarning("Please select at least one contest and enter your rank.");
+    if (selected.length === 0) return setWarning("Please select at least one contest and enter your rank.");
 
     setIsLoading(true);
     setWarning("");
@@ -61,11 +61,11 @@ const PredictionComponent = () => {
         body: JSON.stringify({ username, contests: selected }),
       });
 
-      if (!res.ok) {
+      if (res.ok) {
+        setPredictionResults(await res.json());
+      } else {
         const msgs = { 400: "Username does not exist or invalid data.", 503: "LeetCode API is temporarily unavailable. Try again later." };
         setWarning(msgs[res.status] || `Request failed with status ${res.status}.`);
-      } else {
-        setPredictionResults(await res.json());
       }
     } catch {
       setWarning("Network error. Please check your connection.");
@@ -79,7 +79,6 @@ const PredictionComponent = () => {
       <h1 className="title">Leetcode Rating Predictor</h1>
 
       <form onSubmit={handleSubmit} className="form">
-        {/* Username */}
         <div className="field">
           <label htmlFor="username-input" className="label">Enter Your Username</label>
           <input
@@ -93,7 +92,6 @@ const PredictionComponent = () => {
           />
         </div>
 
-        {/* Contests */}
         {contests.map((contest, i) => (
           <div key={contest.name} className="contest-card">
             <div className="check-row">
@@ -130,13 +128,12 @@ const PredictionComponent = () => {
         </button>
       </form>
 
-      {/* Results */}
-      <div className="results" role="region" aria-live="polite">
+      <section className="results" aria-label="Prediction results" aria-live="polite">
         {isLoading && (
-          <div className="spinner-wrap" role="status">
+          <output className="spinner-wrap">
             <div className="spinner" />
             <span>Loading predictions...</span>
-          </div>
+          </output>
         )}
 
         {predictionResults.map((r) => (
@@ -175,7 +172,7 @@ const PredictionComponent = () => {
         ))}
 
         {warning && <p className="warning" role="alert">{warning}</p>}
-      </div>
+      </section>
     </div>
   );
 };

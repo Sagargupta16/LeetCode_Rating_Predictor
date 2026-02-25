@@ -117,7 +117,15 @@ async def health_check():
     }
 
 
-@app.post("/api/predict", response_model=List[PredictionOutput])
+@app.post(
+    "/api/predict",
+    response_model=List[PredictionOutput],
+    responses={
+        400: {"description": "Invalid input or no contest data"},
+        500: {"description": "Prediction or internal error"},
+        503: {"description": "LeetCode API unavailable"},
+    },
+)
 async def predict(input_data: PredictionInput):
     """Predict rating changes for given contests."""
     try:
@@ -125,6 +133,12 @@ async def predict(input_data: PredictionInput):
 
         current_rating = user_data.get("rating")
         attended_contests = user_data.get("attendedContestsCount")
+        avg_solve_rate = user_data.get("avgSolveRate", 0.5)
+        avg_finish_time = user_data.get("avgFinishTime", 3000)
+        recent_solve_rate = user_data.get("recentSolveRate", 0.5)
+        recent_finish_time = user_data.get("recentFinishTime", 3000)
+        rating_trend = user_data.get("ratingTrend", 0)
+        max_rating = user_data.get("maxRating", current_rating or 1500)
 
         if current_rating is None or attended_contests is None:
             raise HTTPException(
@@ -149,10 +163,19 @@ async def predict(input_data: PredictionInput):
                 total_participants = contest.rank * 2
 
             rank_percentage = (contest.rank * 100) / total_participants
-            log_rank = np.log1p(contest.rank)
+            log_rank = float(np.log1p(contest.rank))
             rating_x_pct = current_rating * (contest.rank / total_participants)
             features = np.array(
-                [[current_rating, contest.rank, total_participants, rank_percentage, attended_contests, log_rank, rating_x_pct]]
+                [[
+                    current_rating, contest.rank, total_participants,  # f1-f3
+                    rank_percentage, attended_contests,                 # f4-f5
+                    avg_solve_rate, avg_finish_time,                    # f6-f7
+                    recent_solve_rate, recent_finish_time,             # f8-f9
+                    rating_trend, max_rating,                          # f10-f11
+                    log_rank, rating_x_pct,                            # f12-f13
+                    avg_solve_rate * current_rating,                   # f14
+                    avg_finish_time / 5400,                            # f15
+                ]]
             )
 
             rating_change = make_prediction(model, scaler, features)

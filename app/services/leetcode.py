@@ -24,6 +24,12 @@ query userContestRankingInfo($username: String!) {
         attendedContestsCount
         rating
     }
+    userContestRankingHistory(username: $username) {
+        attended
+        problemsSolved
+        totalProblems
+        finishTimeInSeconds
+    }
 }
 """
 
@@ -93,6 +99,31 @@ async def fetch_user_data(
                     status_code=400,
                     detail="No contest data found for this username",
                 )
+
+            # Compute history-based features for prediction
+            history = data.get("data", {}).get("userContestRankingHistory") or []
+            attended = [h for h in history if h.get("attended")]
+            solve_rates, finish_times, ratings = [], [], []
+            for h in attended:
+                total_p = h.get("totalProblems", 4) or 4
+                solved = h.get("problemsSolved", 0) or 0
+                solve_rates.append(solved / total_p)
+                ft = h.get("finishTimeInSeconds", 0) or 0
+                if ft > 0:
+                    finish_times.append(ft)
+                ratings.append(h.get("rating", 1500))
+
+            def _avg(vals, default):
+                return sum(vals) / len(vals) if vals else default
+
+            user_data["avgSolveRate"] = _avg(solve_rates, 0.5)
+            user_data["avgFinishTime"] = _avg(finish_times, 3000)
+            user_data["recentSolveRate"] = _avg(solve_rates[-5:], 0.5)
+            recent_ft = [t for t in finish_times[-5:] if t > 0]
+            user_data["recentFinishTime"] = _avg(recent_ft, 3000)
+            changes = [ratings[i] - ratings[i - 1] for i in range(1, len(ratings))]
+            user_data["ratingTrend"] = _avg(changes[-5:], 0)
+            user_data["maxRating"] = max(ratings) if ratings else 1500
 
             cache.set(f"user:{username}", user_data)
             return user_data
