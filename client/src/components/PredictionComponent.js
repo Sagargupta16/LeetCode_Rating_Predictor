@@ -5,7 +5,8 @@ function getApiBaseUrl() {
   if (process.env.REACT_APP_API_BASE_URL) {
     return process.env.REACT_APP_API_BASE_URL;
   }
-  if (typeof globalThis.window !== "undefined" && globalThis.window.location.href.includes("localhost")) {
+  // eslint-disable-next-line no-restricted-globals
+  if (typeof window !== "undefined" && window.location.href.includes("localhost")) {
     return "http://localhost:8000";
   }
   return "https://leetcode-rating-predictor.onrender.com";
