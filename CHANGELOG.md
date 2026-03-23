@@ -13,10 +13,14 @@
 - Docker support, CI/CD workflow
 - Deploy: Render (backend) + GitHub Pages (frontend)
 
-## [1.0.0] - 2025-10-04
+## [1.1.0] - 2023-12-22
 
-- Initial LeetCode rating predictor with ML model
+- Improve model accuracy with updated training
+- Update PredictionComponent CSS and API integration
 
-## [0.1.0] - 2023-12-19
+## [1.0.0] - 2023-12-19
 
-- Project setup and initial experimentation
+- Initial LeetCode rating predictor
+- Jupyter notebooks with Colab integration
+- ML model training and evaluation
+- Basic React frontend with prediction component
