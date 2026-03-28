@@ -2,7 +2,7 @@ fastapi==0.133.1
 pydantic==2.12.5
 numpy==2.4.2
 joblib==1.5.3
-requests==2.32.5
+requests==2.33.0
 uvicorn[standard]==0.41.0
 scikit-learn==1.8.0
 httpx==0.28.1
