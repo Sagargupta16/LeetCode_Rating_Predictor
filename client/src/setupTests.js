@@ -1,4 +1,5 @@
 // setupTests.js - test setup for React Testing Library + MSW
+import "./jest.polyfills";
 import "@testing-library/jest-dom";
 import { server } from "./testServer";
 
