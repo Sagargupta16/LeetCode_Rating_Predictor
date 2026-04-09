@@ -1,5 +1,13 @@
 # LeetCode Contest Rating Predictor
 
+![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
+![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
+![License](https://img.shields.io/github/license/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
+![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
+![Demo](https://img.shields.io/badge/demo-live-brightgreen?style=flat-square)
+
+**[View Live Demo](https://leetcode-rating-predictor.onrender.com/)**
+
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.133.0-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://reactjs.org)
@@ -301,6 +309,15 @@ GitHub Actions: **Lint** (Black, isort, Ruff) -> **Python tests** (pytest) -> **
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## More Projects
+
+| Project | Description |
+|---------|-------------|
+| [Financial Dashboard](https://github.com/Sagargupta16/Financial-Dashboard) | Modern React financial dashboard with analytics and data visualization |
+| [InstagramLikesLeaderboard](https://github.com/Sagargupta16/InstagramLikesLeaderboard) | Browser tool showing who likes your Instagram posts the most |
+| [claude-cost-optimizer](https://github.com/Sagargupta16/claude-cost-optimizer) | Save 30-60% on Claude Code costs - proven strategies and benchmarks |
+| [Contact Manager](https://github.com/Sagargupta16/Contact-Manager-Mern) | Full-stack MERN contact manager with CRUD and dark mode |
 
 ## License
 
