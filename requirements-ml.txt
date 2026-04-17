@@ -1,7 +1,7 @@
 # Heavy ML dependencies (install only when training or running model locally)
-tensorflow==2.20.0
-keras==3.13.2
-h5py==3.15.1
+tensorflow==2.21.0
+keras==3.14.0
+h5py==3.16.0
 
 # GPU support (Linux/WSL2 only — not available on native Windows):
 #   pip install "tensorflow[and-cuda]==2.20.0"
