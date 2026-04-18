@@ -87,3 +87,8 @@ models/history/
 CLAUDE.md
 .claude
 .claude/*
+
+# Added for consistency
+.env.*.local
+*.pyc
+.venv/
