@@ -5,17 +5,17 @@ description = "Neural network LeetCode contest rating predictor (FastAPI + Tenso
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
-    "fastapi==0.133.1",
-    "pydantic==2.12.5",
-    "numpy==2.4.2",
+    "fastapi==0.136.1",
+    "pydantic==2.13.4",
+    "numpy==2.4.5",
     "joblib==1.5.3",
-    "requests==2.33.0",
-    "uvicorn[standard]==0.41.0",
+    "requests==2.34.2",
+    "uvicorn[standard]==0.47.0",
     "scikit-learn==1.8.0",
     "httpx==0.28.1",
-    "python-multipart==0.0.27",
+    "python-multipart==0.0.29",
     "tqdm==4.67.3",
-    "redis==7.2.1",
+    "redis==7.4.0",
 ]
 
 [project.optional-dependencies]
