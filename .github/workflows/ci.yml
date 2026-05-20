@@ -97,6 +97,8 @@ jobs:
         run: npm test -- --silent --watchAll=false
 
       - name: Build client
+        env:
+          CI: false
         run: npm run build
 
   integration:
