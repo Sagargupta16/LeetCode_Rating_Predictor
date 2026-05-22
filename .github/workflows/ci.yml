@@ -10,7 +10,7 @@ jobs:
   python:
     uses: Sagargupta16/shared-workflows/.github/workflows/python-ci.yml@main
     with:
-      python-version: "3.14"
+      python-version: "3.12"
 
   node:
     uses: Sagargupta16/shared-workflows/.github/workflows/node-ci.yml@main
