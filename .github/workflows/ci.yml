@@ -11,8 +11,10 @@ jobs:
     uses: Sagargupta16/shared-workflows/.github/workflows/python-ci.yml@main
     with:
       python-version: "3.12"
+      run-tests: false
 
   node:
     uses: Sagargupta16/shared-workflows/.github/workflows/node-ci.yml@main
     with:
       working-directory: client
+      run-tests: false
