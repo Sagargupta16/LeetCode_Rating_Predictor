@@ -9,6 +9,6 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: PYTHON_VERSION
-        value: "3.11.6"
+        value: "3.12.10"
       - key: NODE_VERSION
         value: "20"
