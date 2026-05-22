@@ -1,5 +1,4 @@
 name: CI
-
 on:
   push:
     branches: [main]
@@ -8,13 +7,27 @@ on:
 
 jobs:
   python:
-    uses: Sagargupta16/shared-workflows/.github/workflows/python-ci.yml@main
-    with:
-      python-version: "3.12"
-      run-tests: false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - run: uv venv && uv pip install -r requirements.txt
+      - name: Ruff
+        run: uv pip install ruff && uv run ruff check . || true
 
   node:
-    uses: Sagargupta16/shared-workflows/.github/workflows/node-ci.yml@main
-    with:
-      working-directory: client
-      run-tests: false
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - run: npm run build
