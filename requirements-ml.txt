@@ -1,8 +1,3 @@
 # Heavy ML dependencies (install only when training or running model locally)
 tensorflow==2.21.0
 keras==3.14.1
-h5py==3.16.0
-
-# GPU support (Linux/WSL2 only — not available on native Windows):
-#   pip install "tensorflow[and-cuda]==2.20.0"
-# On native Windows, TF 2.20 runs CPU-only. For GPU, use WSL2.
