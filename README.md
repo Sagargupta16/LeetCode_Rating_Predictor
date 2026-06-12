@@ -1,17 +1,17 @@
 # LeetCode Contest Rating Predictor
 
-![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
-![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
-![License](https://img.shields.io/github/license/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
-![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square)
+![GitHub stars](https://img.shields.io/github/stars/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square&cacheSeconds=86400)
+![GitHub forks](https://img.shields.io/github/forks/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square&cacheSeconds=86400)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square&cacheSeconds=86400)
 ![Demo](https://img.shields.io/badge/demo-live-brightgreen?style=flat-square)
 
-**[View Live Demo](https://leetcode-rating-predictor.onrender.com/)**
+**[View Live Demo](https://leetcode-rating-predictor.onrender.com/)** -- free-tier instance, first load may take ~1 minute to wake
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.133.0-green.svg)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-19-blue.svg)](https://reactjs.org)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.20.0-orange.svg)](https://tensorflow.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-green.svg)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21.0-orange.svg)](https://tensorflow.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Predict your LeetCode contest rating changes using a Dense neural network trained on 121,000+ contest records. Enter your username, select a contest, and get a prediction.
@@ -172,7 +172,7 @@ TensorFlow on native Windows is CPU-only. For GPU, use WSL2:
 ```bash
 # In Ubuntu (WSL2):
 source ~/tf-gpu/bin/activate
-cd "/mnt/c/Code/GitHub/My Repos/ml-ai/LeetCode_Rating_Predictor"
+cd /mnt/c/path/to/LeetCode_Rating_Predictor
 jupyter notebook notebooks/LC_Contest_Rating_Predictor.ipynb
 ```
 
@@ -185,7 +185,7 @@ wsl --install -d Ubuntu
 sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv
 python3 -m venv ~/tf-gpu
 source ~/tf-gpu/bin/activate
-pip install "tensorflow[and-cuda]==2.20.0" joblib scikit-learn numpy
+pip install "tensorflow[and-cuda]==2.21.0" joblib scikit-learn numpy
 ```
 
 ### After Retraining
