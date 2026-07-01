@@ -157,12 +157,15 @@ async def predict(input_data: PredictionInput):
 
             # registerUserNum from GraphQL is pre-registration count, not
             # actual participants — use a sensible fallback when it's zero or
-            # smaller than the user's rank.
+            # smaller than the user's rank.  The 1.5x factor matches the
+            # synthetic participant count used to build the training data
+            # (scripts/update_data.py), avoiding train/serve skew on the
+            # rank_percentage and rating*percentile features.
             if total_participants == 0:
-                total_participants = max(contest.rank * 2, 10000)
+                total_participants = max(int(contest.rank * 1.5), 10000)
 
             if contest.rank > total_participants:
-                total_participants = contest.rank * 2
+                total_participants = int(contest.rank * 1.5)
 
             rank_percentage = (contest.rank * 100) / total_participants
             log_rank = float(np.log1p(contest.rank))
