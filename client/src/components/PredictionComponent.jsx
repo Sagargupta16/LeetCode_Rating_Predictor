@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import "./PredictionComponent.css";
 
 function getApiBaseUrl() {
-  if (process.env.REACT_APP_API_BASE_URL) {
-    return process.env.REACT_APP_API_BASE_URL;
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
   }
-  // eslint-disable-next-line no-restricted-globals
   if (typeof window !== "undefined" && window.location.href.includes("localhost")) {
     return "http://localhost:8000";
   }

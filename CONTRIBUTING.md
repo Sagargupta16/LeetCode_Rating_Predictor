@@ -24,7 +24,7 @@ pre-commit install
 python -m pytest tests/
 
 # Frontend (11 tests)
-cd client && npx react-scripts test --watchAll=false
+cd client && npm test
 ```
 
 All tests must pass before submitting a PR.
@@ -43,7 +43,7 @@ All tests must pass before submitting a PR.
 1. Create a feature branch: `git checkout -b feature/my-feature`
 2. Make changes, write tests
 3. Run `pre-commit run --all-files`
-4. Run `python -m pytest tests/` and `cd client && npx react-scripts test --watchAll=false`
+4. Run `python -m pytest tests/` and `cd client && npm test`
 5. Commit with descriptive messages (`feat:`, `fix:`, `docs:`)
 6. Open a PR with a clear description
 

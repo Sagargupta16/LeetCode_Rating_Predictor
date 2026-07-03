@@ -218,7 +218,7 @@ python main.py
 ### Prerequisites
 
 - Python 3.11+
-- Node.js 20+
+- Node.js 22+
 
 ### Backend
 
@@ -244,7 +244,7 @@ python -m pytest tests/
 
 # Frontend (11 tests)
 cd client
-npx react-scripts test --watchAll=false
+npm test
 ```
 
 ### Linting
@@ -268,7 +268,7 @@ pre-commit run --all-files
 | `ALLOWED_ORIGINS` | `http://localhost:3000` | CORS origins (comma-separated) |
 | `REDIS_URL` | *(empty)* | Redis URL for caching (optional) |
 | `CACHE_TTL` | `300` | Cache TTL in seconds |
-| `REACT_APP_API_BASE_URL` | *(auto-detected)* | Frontend API endpoint |
+| `VITE_API_BASE_URL` | *(auto-detected)* | Frontend API endpoint |
 
 ## Deployment
 
