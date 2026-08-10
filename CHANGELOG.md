@@ -26,7 +26,11 @@
 
 - Correct the Python version pin: `runtime.txt` and `.python-version` claimed
   3.14.6, but TensorFlow 2.21 ships no 3.14 wheels. Both now say 3.12.10,
-  matching `render.yaml` and CI.
+  matching `render.yaml` and CI. The `Dockerfile` had the same bug
+  (`python:3.14-slim`) and now uses `python:3.12-slim`.
+- Drop `build-essential` from the image; with `--only-binary :all:` and
+  `npm ci --ignore-scripts` nothing is compiled at build time.
+- Drop the obsolete `version` key from `docker-compose.yml`.
 - Resolve all 22 SonarCloud issues and the 1 security hotspot:
   - Use `logger.exception()` in all 9 exception handlers so tracebacks are
     captured instead of a bare message.
@@ -56,6 +60,15 @@
 
 Model predictions are unchanged: `model.keras` loads under keras 3.15.1 and
 returns bit-identical output to keras 3.14.1 / numpy 2.4.6.
+
+### Added
+
+- `requirements.lock.txt` and `requirements-ml.lock.txt`, generated from
+  `uv.lock` with hashes for every transitive dependency. The Docker build
+  installs them with `--require-hashes --only-binary :all:` so the dependency
+  tree is verified and no setup scripts run.
+- An `ml` extra in `pyproject.toml` mirroring `requirements-ml.txt`, and a
+  PEP 735 `dev` dependency group mirroring `requirements-dev.txt`.
 
 ## [2.1.0] - 2026-03-16
 

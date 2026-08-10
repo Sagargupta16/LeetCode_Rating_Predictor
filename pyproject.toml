@@ -22,6 +22,12 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
 ]
+# Heavy ML extras, mirroring requirements-ml.txt. Kept as an extra so uv.lock
+# records hashes for them and the Docker build can install them verifiably.
+ml = [
+    "tensorflow==2.21.0",
+    "keras==3.15.1",
+]
 
 # Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
 # can provision lint and test tooling straight from uv.lock.

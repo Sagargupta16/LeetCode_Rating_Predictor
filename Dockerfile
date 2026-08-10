@@ -6,18 +6,24 @@ WORKDIR /app
 # Build args
 ARG INSTALL_ML=0
 
-# Install system deps
+# Install system deps. No compiler is needed: every pip install below is
+# --only-binary, and npm runs with --ignore-scripts.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl nodejs npm \
+    curl nodejs npm \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
+# requirements*.lock.txt are generated from uv.lock and carry pinned versions
+# plus hashes for every transitive dependency, so --require-hashes can verify
+# the whole tree. Regenerate with `uv export` (see CONTRIBUTING.md).
+COPY requirements.lock.txt ./
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: \
+    -r requirements.lock.txt
 
 # Optionally install heavy ML dependencies at build time
-COPY requirements-ml.txt ./
+COPY requirements-ml.lock.txt ./
 RUN if [ "${INSTALL_ML}" = "1" ]; then \
-    pip install --no-cache-dir --only-binary :all: -r requirements-ml.txt; \
+    pip install --no-cache-dir --require-hashes --only-binary :all: \
+    -r requirements-ml.lock.txt; \
     fi
 
 COPY . .
