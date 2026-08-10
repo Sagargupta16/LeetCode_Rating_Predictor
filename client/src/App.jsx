@@ -23,6 +23,7 @@ class ErrorBoundary extends React.Component {
           <h2>Something went wrong.</h2>
           <p style={{ color: "#9090a8" }}>Please refresh the page and try again.</p>
           <button
+            type="button"
             onClick={() => this.setState({ hasError: false })}
             style={{
               marginTop: "1rem", padding: "0.5rem 1.5rem", background: "#ffa116",

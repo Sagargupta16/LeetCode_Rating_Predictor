@@ -23,6 +23,18 @@ dev = [
     "pytest-asyncio==1.4.0",
 ]
 
+# Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
+# can provision lint and test tooling straight from uv.lock.
+[dependency-groups]
+dev = [
+    "black==26.5.1",
+    "ruff==0.16.2",
+    "isort==8.0.1",
+    "pre-commit==4.6.1",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+]
+
 [build-system]
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
