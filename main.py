@@ -8,7 +8,7 @@ from typing import List
 
 import httpx
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -17,18 +17,22 @@ from app.config import (
     API_HOST,
     API_PORT,
     CACHE_TTL,
-    MODEL_PATH,
+    RATE_LIMIT_REQUESTS,
+    RATE_LIMIT_WINDOW,
     SCALER_PATH,
+    WEIGHTS_PATH,
 )
-from app.model_loader import load_keras_model
-from app.schemas import PredictionInput, PredictionOutput
+from app.model_loader import load_model, load_scaler
+from app.schemas import AttendedContest, PredictionInput, PredictionOutput
 from app.services.leetcode import (
+    fetch_attended_contests,
     fetch_contest_data,
     fetch_user_data,
     find_latest_contests,
 )
 from app.services.prediction import make_prediction
 from app.utils.cache import get_cache
+from app.utils.ratelimit import RateLimiter, client_key
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -43,6 +47,7 @@ scaler = None
 async_client = None
 cache = get_cache(ttl_seconds=CACHE_TTL)
 semaphore = asyncio.Semaphore(5)
+rate_limiter = RateLimiter(RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW)
 
 
 # ---------------------------------------------------------------------------
@@ -54,17 +59,28 @@ async def lifespan(app: FastAPI):
     global model, scaler, async_client
 
     try:
-        logger.info("Loading ML model and scaler...")
-        import joblib
-        import tensorflow as tf
+        logger.info("Loading model and scaler...")
 
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Model file '{MODEL_PATH}' not found")
+        if not os.path.exists(WEIGHTS_PATH):
+            raise FileNotFoundError(
+                f"Weights file '{WEIGHTS_PATH}' not found. "
+                "Run scripts/export_model.py to generate it."
+            )
         if not os.path.exists(SCALER_PATH):
-            raise FileNotFoundError(f"Scaler file '{SCALER_PATH}' not found")
+            raise FileNotFoundError(
+                f"Scaler file '{SCALER_PATH}' not found. "
+                "Run scripts/export_model.py to generate it."
+            )
 
-        model = load_keras_model(tf, MODEL_PATH)
-        scaler = joblib.load(SCALER_PATH)
+        model = load_model(WEIGHTS_PATH)
+        scaler = load_scaler(SCALER_PATH)
+
+        if model.input_shape[1] != scaler.n_features_in_:
+            raise ValueError(
+                f"Model expects {model.input_shape[1]} features but the scaler "
+                f"provides {scaler.n_features_in_}; re-export both artifacts."
+            )
+
         async_client = httpx.AsyncClient(timeout=30.0)
         logger.info("Successfully loaded model, scaler, and HTTP client")
     except Exception:
@@ -84,7 +100,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="2.2.0",
+    version="2.3.0",
     lifespan=lifespan,
 )
 
@@ -117,17 +133,51 @@ async def health_check():
     }
 
 
+@app.get(
+    "/api/userContests/{username}",
+    response_model=List[AttendedContest],
+    responses={
+        400: {"description": "Unknown username or no contest history"},
+        429: {"description": "Rate limit exceeded"},
+        503: {"description": "LeetCode API unavailable"},
+    },
+)
+async def get_user_contests(username: str, request: Request):
+    """List the user's recent attended contests and the ranks they actually got.
+
+    Lets the client prefill the prediction form instead of making people look up
+    their own placements.
+    """
+    rate_limiter.check(client_key(request))
+    try:
+        validated = PredictionInput(username=username, contests=[]).username
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid username") from e
+
+    try:
+        return await fetch_attended_contests(async_client, semaphore, cache, validated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error in userContests endpoint")
+        raise HTTPException(
+            status_code=503, detail="Failed to fetch contest history"
+        ) from e
+
+
 @app.post(
     "/api/predict",
     response_model=List[PredictionOutput],
     responses={
         400: {"description": "Invalid input or no contest data"},
+        429: {"description": "Rate limit exceeded"},
         500: {"description": "Prediction or internal error"},
         503: {"description": "LeetCode API unavailable"},
     },
 )
-async def predict(input_data: PredictionInput):
+async def predict(input_data: PredictionInput, request: Request):
     """Predict rating changes for given contests."""
+    rate_limiter.check(client_key(request))
     try:
         user_data = await fetch_user_data(
             async_client, semaphore, cache, input_data.username

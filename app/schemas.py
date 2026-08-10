@@ -1,7 +1,7 @@
 """Pydantic request/response models."""
 
 import re
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -46,6 +46,13 @@ class PredictionInput(BaseModel):
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError("Username contains invalid characters")
         return v
+
+
+class AttendedContest(BaseModel):
+    name: str
+    title: str
+    rank: int
+    rating_after: Optional[float] = None
 
 
 class PredictionOutput(BaseModel):

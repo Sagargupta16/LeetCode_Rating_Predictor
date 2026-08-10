@@ -15,15 +15,72 @@
 }
 
 /* ── Title ── */
+.card-head {
+  margin-bottom: 2rem;
+}
+
 .title {
   font-size: 1.75rem;
   font-weight: 700;
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
   background: linear-gradient(135deg, #ffa116, #ff6b35);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  text-align: center;
+  color: #b8b8d0;
+}
+
+.hint {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #b8b8d0;
+}
+
+.hint-center {
+  text-align: center;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.input-row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.btn-secondary {
+  flex: 0 0 auto;
+  padding: 0 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #ffc978;
+  background: #2c2c3e;
+  border: 1px solid #4a4a63;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #363648;
+  border-color: #ffa116;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ── Form ── */
@@ -94,6 +151,38 @@
 .contest-card:hover {
   background: rgba(255, 255, 255, 0.06);
   transform: translateY(-1px);
+}
+
+.contest-card.is-active {
+  border-color: rgba(255, 161, 22, 0.45);
+  background: rgba(255, 161, 22, 0.06);
+}
+
+/* ── Loading skeletons ── */
+.skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.skeleton {
+  border-radius: 14px;
+  background: linear-gradient(90deg, #26263a 25%, #33334a 50%, #26263a 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-card {
+  height: 118px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
 }
 
 .check-row {
@@ -186,6 +275,67 @@
   animation: spin 0.8s linear infinite;
 }
 
+/* ── Summary + delta bar ── */
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #2a2a3d;
+  border: 1px solid #43435c;
+  border-radius: 12px;
+}
+
+.summary-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #b8b8d0;
+}
+
+.summary-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.delta-bar {
+  position: relative;
+  height: 6px;
+  margin: 0 0 1rem;
+  border-radius: 999px;
+  background: #2f2f44;
+  overflow: hidden;
+}
+
+.delta-axis {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #5a5a75;
+}
+
+.delta-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  transition: width 0.45s ease-out;
+}
+
+.delta-fill.positive {
+  left: 50%;
+  background: linear-gradient(90deg, #34d399, #10b981);
+}
+
+.delta-fill.negative {
+  right: 50%;
+  background: linear-gradient(270deg, #f87171, #ef4444);
+}
+
 /* ── Result Card ── */
 .result-card {
   margin-top: 1rem;
@@ -245,7 +395,19 @@
   color: #f87171;
 }
 
-/* ── Warning ── */
+/* ── Notice + Warning ── */
+.notice {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ce8c4;
+  background: #23372f;
+  border: 1px solid #2f5c47;
+  border-radius: 10px;
+  text-align: center;
+}
+
 .warning {
   margin-top: 1rem;
   padding: 0.75rem;
@@ -276,6 +438,30 @@
   }
 }
 
+/* ── Accessibility ── */
+.input:focus-visible,
+.btn:focus-visible,
+.btn-secondary:focus-visible,
+.checkbox:focus-visible {
+  outline: 2px solid #ffc978;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .contest-card:hover,
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .glass-card {
@@ -289,5 +475,13 @@
 
   .result-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .input-row {
+    flex-direction: column;
+  }
+
+  .btn-secondary {
+    padding: 0.7rem 1rem;
   }
 }

@@ -27,9 +27,19 @@ ALLOWED_ORIGINS = [
     if o.strip()
 ]
 
-# Model paths
-MODEL_PATH = os.environ.get("MODEL_PATH", "./model.keras")
-SCALER_PATH = os.environ.get("SCALER_PATH", "./scaler.save")
+# Model artifacts. Exported by scripts/export_model.py; the runtime needs no
+# ML framework to read them.
+WEIGHTS_PATH = os.environ.get("WEIGHTS_PATH", "./models/weights.npz")
+SCALER_PATH = os.environ.get("SCALER_PATH", "./models/scaler.json")
+
+# Sanity bound on model output. A single contest cannot plausibly move a rating
+# further than this, so a larger magnitude means the model or its inputs are
+# wrong and the request should fail loudly instead of returning nonsense.
+MAX_RATING_CHANGE = float(os.environ.get("MAX_RATING_CHANGE", "500"))
+
+# Rate limiting (requests per window, per client IP)
+RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
+RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
 
 # Server
 API_HOST = os.environ.get("API_HOST", "0.0.0.0")

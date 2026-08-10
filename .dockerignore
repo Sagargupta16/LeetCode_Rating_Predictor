@@ -2,4 +2,16 @@ node_modules
 .git
 .env
 dist
-# v1
+build
+.venv
+venv
+__pycache__
+.pytest_cache
+.ruff_cache
+notebooks
+
+# Training-only artifacts. Serving reads models/weights.npz and
+# models/scaler.json, which scripts/export_model.py derives from these.
+model.keras
+scaler.save
+data

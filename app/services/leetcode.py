@@ -33,6 +33,20 @@ query userContestRankingInfo($username: String!) {
 }
 """
 
+USER_HISTORY_QUERY = """
+query userContestRankingInfo($username: String!) {
+    userContestRankingHistory(username: $username) {
+        attended
+        rating
+        ranking
+        contest {
+            title
+            titleSlug
+        }
+    }
+}
+"""
+
 CONTEST_DETAIL_QUERY = """
 query contestDetailPage($contestSlug: String!) {
     contestDetailPage(contestSlug: $contestSlug) {
@@ -141,6 +155,74 @@ async def fetch_user_data(
                 status_code=503,
                 detail="Failed to fetch user data from LeetCode",
             ) from e
+
+
+async def fetch_attended_contests(
+    client: httpx.AsyncClient,
+    semaphore,
+    cache,
+    username: str,
+    limit: int = 10,
+) -> List[Dict[str, Any]]:
+    """Return the user's most recent attended contests with their real ranks.
+
+    Lets the UI prefill the form instead of asking people to look their own
+    placements up by hand. Only contests matching the supported slug pattern are
+    returned, so the results can be fed straight back into ``/api/predict``.
+    """
+    cache_key = f"history:{username}:{limit}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    async with semaphore:
+        try:
+            response = await client.post(
+                LEETCODE_GRAPHQL_URL,
+                headers=GRAPHQL_HEADERS,
+                json={
+                    "query": USER_HISTORY_QUERY,
+                    "variables": {"username": username},
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+        except httpx.HTTPError as e:
+            logger.exception("HTTP error fetching contest history")
+            raise HTTPException(
+                status_code=503,
+                detail="Failed to fetch contest history from LeetCode",
+            ) from e
+
+    history = data.get("data", {}).get("userContestRankingHistory")
+    if history is None:
+        raise HTTPException(
+            status_code=400, detail="No contest history found for this username"
+        )
+
+    attended: List[Dict[str, Any]] = []
+    for entry in history:
+        if not entry.get("attended"):
+            continue
+        contest = entry.get("contest") or {}
+        slug = contest.get("titleSlug")
+        ranking = entry.get("ranking")
+        if not slug or not CONTEST_NAME_RE.match(slug):
+            continue
+        if not isinstance(ranking, int) or ranking <= 0:
+            continue
+        attended.append(
+            {
+                "name": slug,
+                "title": contest.get("title", slug),
+                "rank": ranking,
+                "rating_after": entry.get("rating"),
+            }
+        )
+
+    attended = attended[-limit:][::-1]
+    cache.set(cache_key, attended)
+    return attended
 
 
 async def fetch_contest_data(

@@ -5,7 +5,26 @@
 1. Fork and clone the repo
 2. `python -m venv venv && venv\Scripts\activate` (or `source venv/bin/activate`)
 3. `pip install -r requirements.txt -r requirements-dev.txt`
-4. `cd client && npm ci && cd ..`
+4. `cd client && npm ci --ignore-scripts && cd ..`
+
+Serving needs no ML framework. Only add `-r requirements-ml.txt` if you intend
+to retrain or re-export the model.
+
+## Model artifacts
+
+The API reads `models/weights.npz` and `models/scaler.json`, which are generated
+from `model.keras` and `scaler.save`. After retraining, regenerate them in the
+same commit as the new model:
+
+```bash
+pip install -r requirements-ml.txt
+python scripts/export_model.py
+```
+
+`tests/test_model_artifacts.py` pins the prediction for a fixed input. A
+legitimate retrain will change it -- update `GOLDEN_PREDICTION` alongside the new
+artifacts, and say so in the PR. An *unexpected* change means something else
+moved, so investigate before touching the constant.
 
 ## Code Style
 
@@ -20,10 +39,10 @@ pre-commit install
 ## Testing
 
 ```bash
-# Backend (34 tests)
+# Backend (59 tests)
 python -m pytest tests/
 
-# Frontend (11 tests)
+# Frontend (19 tests)
 cd client && npm test
 ```
 

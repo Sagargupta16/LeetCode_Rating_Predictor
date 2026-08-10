@@ -8,13 +8,15 @@
 
 **[View Live Demo](https://leetcode-rating-predictor.onrender.com/)** -- free-tier instance, first load may take ~1 minute to wake
 
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-green.svg)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21.0-orange.svg)](https://tensorflow.org)
+[![NumPy](https://img.shields.io/badge/inference-NumPy-orange.svg)](https://numpy.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Predict your LeetCode contest rating changes using a Dense neural network trained on 121,000+ contest records. Enter your username, select a contest, and get a prediction.
+Predict your LeetCode contest rating changes using a Dense neural network trained on 121,000+ contest records. Enter your username, hit **Auto-fill** to pull your real ranks from past contests, and get a prediction.
+
+The trained network is a small Dense stack, so the API evaluates it with NumPy against exported weights. Serving needs no TensorFlow, Keras, scikit-learn or joblib: the runtime environment is ~65 MB instead of ~1.8 GB, and those frameworks are only required to retrain.
 
 ## Quick Start
 
@@ -28,12 +30,13 @@ python -m venv venv
 venv\Scripts\activate       # Windows
 # source venv/bin/activate  # Linux/Mac
 
-# Install and run
+# Install and run -- no ML framework needed to serve predictions
 pip install -r requirements.txt
-pip install -r requirements-ml.txt   # For model loading (TensorFlow)
 python main.py
 # Open http://localhost:8000
 ```
+
+Retraining or re-exporting the model additionally needs `pip install -r requirements-ml.txt`.
 
 ## Architecture
 
@@ -41,7 +44,8 @@ python main.py
 React Frontend (port 3000)  -->  FastAPI Backend (port 8000)
                                     |
                                     +-- LeetCode GraphQL API
-                                    +-- Dense Neural Network (model.keras)
+                                    +-- NumPy Dense network
+                                        (models/weights.npz + scaler.json)
 ```
 
 All LeetCode data is fetched via **GraphQL** (the REST ranking API is blocked).
@@ -53,22 +57,24 @@ main.py                          # FastAPI entry point
 app/                             # Backend package
   config.py                      #   Environment variables, constants
   schemas.py                     #   Pydantic request/response models
-  model_loader.py                #   Keras model loader (handles legacy HDF5)
+  model_loader.py                #   NumPy Dense network + scaler loader
   services/
     leetcode.py                  #   LeetCode GraphQL client
-    prediction.py                #   ML prediction logic
+    prediction.py                #   Prediction + output sanity bounds
   utils/
     cache.py                     #   TTLCache / RedisCache
+    ratelimit.py                 #   Per-IP fixed-window rate limiting
 scripts/
+  export_model.py                # model.keras/scaler.save -> models/*.npz|json
   download_model.py              # Download model artifacts from URLs
   update_data.py                 # Fetch training data from LeetCode
   check.py                       # Smoke test the running API
 notebooks/
   LC_Contest_Rating_Predictor.ipynb  # Training notebook
-data/                            # Training data (gitignored)
-models/                          # Model manifest
-tests/                           # 34 backend tests
-client/                          # React frontend (11 tests)
+data/                            # Training data
+models/                          # Exported weights + scaler (served artifacts)
+tests/                           # 59 backend tests
+client/                          # React frontend (19 tests)
 ```
 
 ## API
@@ -100,6 +106,26 @@ client/                          # React frontend (11 tests)
 ]
 ```
 
+### `GET /api/userContests/{username}`
+
+Returns the user's recent attended contests with the ranks they actually got, so
+the UI can prefill the form instead of asking people to look their own
+placements up:
+
+```json
+[
+  {
+    "name": "weekly-contest-490",
+    "title": "Weekly Contest 490",
+    "rank": 742,
+    "rating_after": 1825.5
+  }
+]
+```
+
+Only contests whose slug matches `(weekly|biweekly)-contest-<n>` are returned,
+so results can be posted straight back to `/api/predict`.
+
 ### `GET /api/contestData`
 
 Returns the latest contests (via GraphQL `topTwoContests`).
@@ -108,6 +134,12 @@ Returns the latest contests (via GraphQL `topTwoContests`).
 
 Health check with model/scaler/client status.
 
+### Rate limiting
+
+`/api/predict` and `/api/userContests/{username}` allow 30 requests per minute
+per client IP by default (`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), and
+return `429` with a `Retry-After` header once exceeded.
+
 ## ML Model
 
 ### Architecture
@@ -115,24 +147,49 @@ Health check with model/scaler/client status.
 Dense neural network (replaced LSTM since input is tabular, not sequential):
 
 ```
-Dense(64, relu) -> Dropout(0.2) -> Dense(32, relu) -> Dropout(0.2) -> Dense(16, relu) -> Dense(1)
+Dense(128, relu) -> Dropout(0.3) -> Dense(64, relu) -> Dropout(0.2) -> Dense(32, relu) -> Dense(1)
 ```
 
-3,137 parameters. Trained with Adam (lr=0.001), MSE loss, early stopping (patience=10).
+12,417 parameters. Trained with Adam, MSE loss, early stopping.
 
-### 7 Input Features
+### Serving
 
-| # | Feature | Correlation with output |
-|---|---------|------------------------|
-| 1 | Current rating | -0.148 |
-| 2 | Contest rank | -0.474 |
-| 3 | Total participants | -0.308 |
-| 4 | Rank percentage (rank*100/participants) | -0.495 |
-| 5 | Attended contests count | -0.115 |
-| 6 | log(1 + rank) | **-0.508** |
-| 7 | Rating * percentile | **-0.555** |
+Dropout is the identity at inference, so the served model is four matrix
+multiplies. `scripts/export_model.py` flattens the Keras model into
+`models/weights.npz` and reduces the pickled `MinMaxScaler` to its two transform
+vectors in `models/scaler.json`:
 
-Features 6 and 7 are engineered and provide the strongest signal.
+```bash
+pip install -r requirements-ml.txt
+python scripts/export_model.py
+```
+
+The NumPy path agrees with TensorFlow to within 2.3e-05 on the served weights
+(the scaler is exact), which is far below the two decimals the UI renders. A
+golden test in `tests/test_model_artifacts.py` pins the output so a dependency
+bump or re-export cannot silently change predictions.
+
+### 15 Input Features
+
+| # | Feature |
+|---|---------|
+| 1 | Current rating |
+| 2 | Contest rank |
+| 3 | Total participants |
+| 4 | Rank percentage (rank*100/participants) |
+| 5 | Attended contests count |
+| 6 | Average solve rate |
+| 7 | Average finish time |
+| 8 | Recent solve rate (last 5) |
+| 9 | Recent finish time (last 5) |
+| 10 | Rating trend (last 5) |
+| 11 | Max rating |
+| 12 | log(1 + rank) |
+| 13 | Rating * percentile |
+| 14 | Average solve rate * current rating |
+| 15 | Average finish time / 5400 |
+
+Features 12 and 13 are engineered and historically carried the strongest signal.
 
 ### Performance
 
@@ -142,7 +199,11 @@ Features 6 and 7 are engineered and provide the strongest signal.
 | Test RMSE | 12.26 |
 | Test MSE | 150.34 |
 | Training data | 121,241 records |
-| Early stopped at | Epoch 38/200 |
+
+Caveat: `registerUserNum` from GraphQL is a pre-registration count, so when a
+contest reports zero participants the API substitutes `max(rank * 1.5, 10000)`
+to match how the training data was built. Participant count feeds features 3, 4
+and 13, so improving that source is the most promising accuracy work left.
 
 ## Updating Training Data
 
