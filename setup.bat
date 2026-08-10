@@ -17,17 +17,18 @@ REM Activate virtual environment
 echo 🔧 Activating virtual environment...
 call venv\Scripts\activate.bat
 
-REM Install Python dependencies
+REM Install Python dependencies. --only-binary keeps pip from running setup
+REM scripts out of source distributions.
 echo 📚 Installing Python dependencies...
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install --upgrade --only-binary :all: pip
+pip install --only-binary :all: -r requirements.txt
 
 REM Check if Node.js is installed
 node --version >nul 2>&1
 if %errorlevel% equ 0 (
     echo 🌐 Setting up React frontend...
     cd client
-    npm install
+    npm install --ignore-scripts
     cd ..
 ) else (
     echo ⚠️  Node.js not found. Frontend setup skipped.
