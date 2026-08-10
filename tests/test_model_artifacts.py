@@ -129,8 +129,9 @@ def test_rejects_implausible_output(scaler):
         def predict(self, x, verbose=0):
             return np.array([[9999.0]])
 
+    runaway = RunawayModel()
     with pytest.raises(HTTPException) as exc_info:
-        make_prediction(RunawayModel(), scaler, GOLDEN_FEATURES)
+        make_prediction(runaway, scaler, GOLDEN_FEATURES)
     assert exc_info.value.status_code == 500
 
 

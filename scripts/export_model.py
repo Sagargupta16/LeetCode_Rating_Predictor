@@ -27,6 +27,24 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 SUPPORTED_ACTIVATIONS = {"relu", "linear"}
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _checked_output_path(path: Path) -> Path:
+    """Resolve an output path and refuse anything outside the repository.
+
+    The paths come from CLI arguments and are used to create directories and
+    write files, so confine them rather than trusting the caller.
+    """
+    resolved = (
+        (REPO_ROOT / path).resolve() if not path.is_absolute() else path.resolve()
+    )
+    if not resolved.is_relative_to(REPO_ROOT):
+        raise ValueError(
+            f"refusing to write outside the repository: {resolved} "
+            f"is not inside {REPO_ROOT}"
+        )
+    return resolved
 
 
 def export_weights(model_path: Path, out_path: Path) -> None:
@@ -70,11 +88,12 @@ def export_weights(model_path: Path, out_path: Path) -> None:
     input_dim = int(arrays["w0"].shape[0])
     meta = {"activations": activations, "input_dim": input_dim, "layers": index}
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(out_path, meta=json.dumps(meta), **arrays)
+    target = _checked_output_path(out_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(target, meta=json.dumps(meta), **arrays)
     logger.info(
         "wrote %s (%d Dense layers, input_dim=%d, activations=%s)",
-        out_path,
+        target,
         index,
         input_dim,
         activations,
@@ -105,9 +124,10 @@ def export_scaler(scaler_path: Path, out_path: Path) -> None:
         "min": np.asarray(scaler.min_, dtype=np.float64).tolist(),
     }
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    logger.info("wrote %s (%d features)", out_path, payload["n_features_in"])
+    target = _checked_output_path(out_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    logger.info("wrote %s (%d features)", target, payload["n_features_in"])
 
 
 def main() -> None:

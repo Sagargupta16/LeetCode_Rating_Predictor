@@ -47,8 +47,8 @@ class DenseNetwork:
         self._activations = activations
         self.input_shape = (None, input_dim)
 
-    def predict(self, x: np.ndarray, verbose: int = 0) -> np.ndarray:
-        """Run a forward pass. ``verbose`` exists for Keras call compatibility."""
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        """Run a forward pass."""
         activations = np.asarray(x, dtype=np.float32)
         if activations.ndim != 2:
             raise ValueError(f"expected a 2D input, got shape {activations.shape}")

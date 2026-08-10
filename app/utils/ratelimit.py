@@ -49,11 +49,11 @@ class RateLimiter:
     def cleanup(self) -> None:
         """Drop buckets that have fully expired, so memory does not creep."""
         now = time.monotonic()
-        for key in list(self._hits):
-            bucket = self._hits[key]
+        for bucket in self._hits.values():
             self._prune(bucket, now)
-            if not bucket:
-                del self._hits[key]
+        expired = [key for key, bucket in self._hits.items() if not bucket]
+        for key in expired:
+            del self._hits[key]
 
 
 def client_key(request: Request) -> str:

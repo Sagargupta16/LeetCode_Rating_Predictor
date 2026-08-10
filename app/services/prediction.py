@@ -30,7 +30,7 @@ def make_prediction(model, scaler, input_data: np.ndarray) -> float:
                 (input_scaled.shape[0], 1, input_scaled.shape[1])
             )
 
-        prediction = model.predict(input_scaled, verbose=0)
+        prediction = model.predict(input_scaled)
         value = float(prediction[0][0])
     except Exception as e:
         logger.exception("Error making prediction")
