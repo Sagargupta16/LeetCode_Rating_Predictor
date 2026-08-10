@@ -23,10 +23,11 @@ class ErrorBoundary extends React.Component {
           <h2>Something went wrong.</h2>
           <p style={{ color: "#9090a8" }}>Please refresh the page and try again.</p>
           <button
+            type="button"
             onClick={() => this.setState({ hasError: false })}
             style={{
               marginTop: "1rem", padding: "0.5rem 1.5rem", background: "#ffa116",
-              color: "#fff", border: "none", borderRadius: "8px", cursor: "pointer",
+              color: "#1a1a2e", border: "none", borderRadius: "8px", cursor: "pointer",
             }}
           >
             Try Again
@@ -34,16 +35,14 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
-    return this.props.children;
+    return <PredictionComponent />;
   }
 }
 
 function App() {
   return (
     <div className="App">
-      <ErrorBoundary>
-        <PredictionComponent />
-      </ErrorBoundary>
+      <ErrorBoundary />
     </div>
   );
 }

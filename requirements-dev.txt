@@ -1,7 +1,7 @@
 # Dev tools for linting, formatting and testing
 black==26.5.1
-ruff==0.15.16
+ruff==0.16.2
 isort==8.0.1
-pre-commit==4.6.0
-pytest==9.0.3
+pre-commit==4.6.1
+pytest==9.1.1
 pytest-asyncio==1.4.0

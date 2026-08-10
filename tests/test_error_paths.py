@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import main as app_module
@@ -98,12 +99,12 @@ def test_fetch_user_data_http_error():
         async def post(self, *args, **kwargs):
             raise httpx.HTTPError("Connection failed")
 
-    with pytest.raises(Exception):
-        asyncio.run(
-            fetch_user_data(
-                DummyClient(), asyncio.Semaphore(5), TTLCache(), "nonexistent"
-            )
-        )
+    coro = fetch_user_data(
+        DummyClient(), asyncio.Semaphore(5), TTLCache(), "nonexistent"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(coro)
+    assert exc_info.value.status_code == 503
 
 
 def test_fetch_contest_data_invalid_name():
@@ -113,12 +114,12 @@ def test_fetch_contest_data_invalid_name():
     class DummyClient:
         pass
 
-    with pytest.raises(Exception):
-        asyncio.run(
-            fetch_contest_data(
-                DummyClient(), asyncio.Semaphore(5), TTLCache(), "invalid-name"
-            )
-        )
+    coro = fetch_contest_data(
+        DummyClient(), asyncio.Semaphore(5), TTLCache(), "invalid-name"
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(coro)
+    assert exc_info.value.status_code == 400
 
 
 def test_nonexistent_endpoint():

@@ -29,6 +29,26 @@ cd client && npm test
 
 All tests must pass before submitting a PR.
 
+## Dependencies
+
+Human-editable pins live in `requirements.txt` (runtime), `requirements-ml.txt`
+(TensorFlow/Keras) and `requirements-dev.txt` (tooling). `pyproject.toml`
+mirrors them so `uv.lock` can resolve the full tree.
+
+`requirements.lock.txt` and `requirements-ml.lock.txt` are generated and carry
+hashes for every transitive dependency; the Docker build installs them with
+`--require-hashes`. After changing any pin, refresh them:
+
+```bash
+uv lock
+uv export --no-dev --no-emit-project --format requirements-txt -o requirements.lock.txt
+uv export --no-dev --no-emit-project --extra ml --format requirements-txt -o requirements-ml.lock.txt
+```
+
+Python is pinned to 3.12 (`runtime.txt`, `.python-version`, `render.yaml`,
+`Dockerfile`) because TensorFlow 2.21 publishes no 3.13+ wheels. Keep those in
+sync.
+
 ## Project Layout
 
 - `app/` -- backend package (config, schemas, services, utils)

@@ -1,32 +1,57 @@
 [project]
 name = "leetcode-rating-predictor"
-version = "1.0.0"
+version = "2.2.0"
 description = "Neural network LeetCode contest rating predictor (FastAPI + TensorFlow)"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "fastapi==0.136.3",
+    "fastapi==0.141.1",
     "pydantic==2.13.4",
-    "numpy==2.4.6",
+    "numpy==2.5.2",
     "joblib==1.5.3",
     "requests==2.34.2",
-    "uvicorn[standard]==0.49.0",
+    "uvicorn[standard]==0.52.1",
     "scikit-learn==1.9.0",
     "httpx==0.28.1",
-    "python-multipart==0.0.32",
-    "tqdm==4.68.1",
-    "redis==8.0.1",
+    "tqdm==4.70.0",
+    "redis==8.1.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.3",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+]
+# Heavy ML extras, mirroring requirements-ml.txt. Kept as an extra so uv.lock
+# records hashes for them and the Docker build can install them verifiably.
+ml = [
+    "tensorflow==2.21.0",
+    "keras==3.15.1",
+]
+
+# Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
+# can provision lint and test tooling straight from uv.lock.
+[dependency-groups]
+dev = [
+    "black==26.5.1",
+    "ruff==0.16.2",
+    "isort==8.0.1",
+    "pre-commit==4.6.1",
+    "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
 ]
 
 [build-system]
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
+
+# The repo is a flat layout with several non-package directories (data, models,
+# client, notebooks), so setuptools cannot auto-discover what to package.
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
 
 [tool.black]
 line-length = 88
@@ -36,7 +61,7 @@ profile = "black"
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 exclude = ["venv", "__pycache__", "client", "notebooks"]
 
 [tool.ruff.lint]
@@ -48,7 +73,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "B017"]
+"tests/*" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

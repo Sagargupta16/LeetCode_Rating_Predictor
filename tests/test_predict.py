@@ -41,8 +41,9 @@ def test_make_prediction_returns_float():
 
 
 def test_make_prediction_model_not_loaded():
+    arr = np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]])
     with pytest.raises(HTTPException) as exc_info:
-        make_prediction(None, None, np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]]))
+        make_prediction(None, None, arr)
     assert exc_info.value.status_code == 500
 
 
@@ -57,12 +58,9 @@ def test_make_prediction_scaler_error():
         def predict(self, x, verbose=0):
             return np.array([[0.0]])
 
+    arr = np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]])
     with pytest.raises(HTTPException) as exc_info:
-        make_prediction(
-            DummyModel(),
-            BadScaler(),
-            np.array([[1800, 500, 8000, 6.25, 45, 6.2, 160.0]]),
-        )
+        make_prediction(DummyModel(), BadScaler(), arr)
     assert exc_info.value.status_code == 500
 
 

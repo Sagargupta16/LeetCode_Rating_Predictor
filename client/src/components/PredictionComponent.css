@@ -57,7 +57,7 @@
   font-size: 0.95rem;
   font-family: inherit;
   color: #e2e2f0;
-  background: rgba(255, 255, 255, 0.06);
+  background: #323244;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   outline: none;
@@ -71,7 +71,7 @@
 .input:focus {
   border-color: #ffa116;
   box-shadow: 0 0 0 3px rgba(255, 161, 22, 0.15);
-  background: rgba(255, 255, 255, 0.08);
+  background: #363648;
 }
 
 .input:disabled {
@@ -141,7 +141,7 @@
   font-size: 1rem;
   font-weight: 600;
   font-family: inherit;
-  color: #fff;
+  color: #1a1a2e;
   background: linear-gradient(135deg, #ffa116, #ff6b35);
   border: none;
   border-radius: 12px;
@@ -251,8 +251,8 @@
   padding: 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #f87171;
-  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+  background: #3a2d3e;
   border: 1px solid rgba(248, 113, 113, 0.25);
   border-radius: 10px;
   text-align: center;
