@@ -1,3 +1,4 @@
-# Heavy ML dependencies (install only when training or running model locally)
+# Heavy ML dependencies (install only when training or running model locally).
+# requirements-ml.lock.txt is the generated, hash-pinned equivalent.
 tensorflow==2.21.0
 keras==3.15.1

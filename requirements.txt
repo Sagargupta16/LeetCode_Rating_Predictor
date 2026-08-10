@@ -1,3 +1,5 @@
+# Runtime dependencies. Human-editable pins; requirements.lock.txt is the
+# generated, hash-pinned resolution used by the Docker build (see CONTRIBUTING.md).
 fastapi==0.141.1
 pydantic==2.13.4
 numpy==2.5.2
