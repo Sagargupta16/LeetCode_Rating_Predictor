@@ -5,17 +5,23 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      # astral-sh/setup-uv v7.6.0
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
         with:
           python-version: "3.12"
-      - run: uv venv && uv pip install -r requirements.txt
+      - run: uv venv && uv pip install -r requirements.txt -r requirements-dev.txt
       - name: Ruff
-        run: uv pip install ruff && uv run ruff check . || true
+        run: uv run ruff check .
+      - name: Pytest
+        run: uv run pytest -q
 
   node:
     runs-on: ubuntu-latest
@@ -30,4 +36,5 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      - run: npm test
       - run: npm run build
