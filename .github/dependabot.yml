@@ -1,0 +1,28 @@
+# Renovate handles version-update PRs for this repo, so Dependabot's PRs are
+# switched off with open-pull-requests-limit: 0.
+#
+# The ecosystems are still declared on purpose: Dependabot only refreshes the
+# dependency graph for ecosystems it knows about, and once uv.lock appeared it
+# stopped re-scanning requirements*.txt. That left a frozen snapshot behind
+# (keras 3.13.2, python-multipart 0.0.27, tensorflow 2.20.0) which kept
+# generating alerts for versions no longer in the repo. Declaring pip here asks
+# Dependabot to scan those manifests again.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0

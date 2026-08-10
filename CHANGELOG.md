@@ -1,5 +1,69 @@
 # Changelog
 
+## [2.3.0] - 2026-08-10
+
+### Changed
+
+- **Inference no longer uses TensorFlow.** The served model is a Dense stack, so
+  `scripts/export_model.py` flattens it into `models/weights.npz` plus a
+  `models/scaler.json` holding the `MinMaxScaler` transform vectors, and the API
+  evaluates it with NumPy. TensorFlow, Keras, scikit-learn and joblib moved to
+  `requirements-ml.txt` as training-only dependencies.
+  - Runtime environment drops from ~1,769 MB to ~65 MB of site-packages.
+  - Model + scaler load in 0.34s instead of importing TensorFlow first
+    (~2.7s locally, warm); a prediction takes ~0.15ms.
+  - Permanently removes the keras advisory surface from the served image.
+  - Removes the `scaler.save` pickle from the serving path, and with it the
+    `InconsistentVersionWarning` from loading a scikit-learn 1.8.0 pickle
+    under 1.9.0.
+  - Docker and Render builds no longer install the ML stack at all.
+- Predictions are unchanged in substance: NumPy agrees with TensorFlow to
+  2.3e-05 on the exported weights (the scaler is bit-exact), well below the two
+  decimals the UI renders.
+- `app/model_loader.py` no longer needs its legacy HDF5 migration path.
+
+### Added
+
+- **Auto-fill.** `GET /api/userContests/{username}` returns the user's recent
+  attended contests with their real ranks, and the UI can fill the form from it
+  instead of asking people to look their own placements up. Only slugs matching
+  `(weekly|biweekly)-contest-<n>` are returned so results post straight back to
+  `/api/predict`.
+- **Rate limiting.** Per-IP fixed window (default 30 requests/minute) on
+  `/api/predict` and `/api/userContests`, returning `429` with `Retry-After`.
+  The endpoints are public and each request costs an inference plus upstream
+  calls.
+- **Output sanity bound.** Predictions outside +/-`MAX_RATING_CHANGE` (default
+  500) or non-finite are now rejected as a 500 rather than returned.
+- **Golden regression test** (`tests/test_model_artifacts.py`) pinning the real
+  model's output for a fixed input. Every other backend test used dummy models,
+  so nothing would have caught a dependency bump silently shifting predictions.
+- Weekly `refresh-data` workflow that runs `scripts/update_data.py` and opens a
+  PR. The script existed but nothing scheduled it.
+- `.github/dependabot.yml` declaring the pip, npm and github-actions ecosystems
+  with `open-pull-requests-limit: 0` (Renovate still owns update PRs). Once
+  `uv.lock` appeared Dependabot stopped re-scanning `requirements*.txt`, leaving
+  a frozen snapshot that kept generating alerts for versions no longer present.
+
+### UI
+
+- Auto-fill button beside the username field, with distinct messaging for
+  unknown users, rate limiting and empty history.
+- Shimmer skeletons while the contest list loads, instead of an empty gap.
+- Signed delta bar per result and a net-change summary across multiple contests.
+- Selected contests are visually highlighted; a hint shows how many are ready.
+- Visible `:focus-visible` rings, `prefers-reduced-motion` support, and the
+  username/auto-fill row stacks on narrow screens.
+- Backend test count 34 -> 59, frontend 11 -> 19.
+
+### Fixed
+
+- README documented the model as 7 features and 3,137 parameters; it is
+  15 features and 12,417 parameters (`15->128->64->32->1`). Also documents the
+  synthetic participant-count fallback, which is the main known accuracy limit.
+- `requirements-dev.txt` tooling and `.dockerignore` now exclude training-only
+  artifacts from the image.
+
 ## [2.2.0] - 2026-08-10
 
 ### Security
