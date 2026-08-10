@@ -20,16 +20,17 @@ else
     source venv/bin/activate
 fi
 
-# Install Python dependencies
+# Install Python dependencies. --only-binary keeps pip from running setup
+# scripts out of source distributions.
 echo "📚 Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
+pip install --upgrade --only-binary :all: pip
+pip install --only-binary :all: -r requirements.txt
 
 # Check if Node.js is installed for frontend
 if command -v node &> /dev/null; then
     echo "🌐 Setting up React frontend..."
     cd client
-    npm install
+    npm install --ignore-scripts
     cd ..
 else
     echo "⚠️  Node.js not found. Frontend setup skipped."
