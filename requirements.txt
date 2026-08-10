@@ -1,11 +1,10 @@
-fastapi==0.136.3
+fastapi==0.141.1
 pydantic==2.13.4
-numpy==2.4.6
+numpy==2.5.2
 joblib==1.5.3
 requests==2.34.2
-uvicorn[standard]==0.49.0
+uvicorn[standard]==0.52.1
 scikit-learn==1.9.0
 httpx==0.28.1
-python-multipart==0.0.32
-tqdm==4.68.1
-redis==8.0.1
+tqdm==4.70.0
+redis==8.1.0
