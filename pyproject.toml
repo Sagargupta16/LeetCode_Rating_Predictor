@@ -27,6 +27,14 @@ dev = [
 requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
 
+# The repo is a flat layout with several non-package directories (data, models,
+# client, notebooks), so setuptools cannot auto-discover what to package.
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
 [tool.black]
 line-length = 88
 

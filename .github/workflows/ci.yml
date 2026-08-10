@@ -19,9 +19,9 @@ jobs:
           python-version: "3.12"
       - run: uv venv && uv pip install -r requirements.txt -r requirements-dev.txt
       - name: Ruff
-        run: uv run ruff check .
+        run: uv run --no-project ruff check .
       - name: Pytest
-        run: uv run pytest -q
+        run: uv run --no-project python -m pytest -q
 
   node:
     runs-on: ubuntu-latest
