@@ -5,7 +5,7 @@ function getApiBaseUrl() {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
-  if (typeof window !== "undefined" && window.location.href.includes("localhost")) {
+  if (globalThis.location?.href?.includes("localhost")) {
     return "http://localhost:8000";
   }
   return "https://leetcode-rating-predictor.onrender.com";

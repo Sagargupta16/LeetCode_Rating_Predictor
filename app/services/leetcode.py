@@ -130,13 +130,13 @@ async def fetch_user_data(
         except HTTPException:
             raise
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error fetching user data: {e}")
+            logger.exception("HTTP error fetching user data")
             raise HTTPException(
                 status_code=503,
                 detail="Failed to fetch user data from LeetCode",
             ) from e
         except Exception as e:
-            logger.error(f"Error fetching user data: {e}")
+            logger.exception("Error fetching user data")
             raise HTTPException(
                 status_code=503,
                 detail="Failed to fetch user data from LeetCode",
@@ -188,13 +188,13 @@ async def fetch_contest_data(
         except HTTPException:
             raise
         except httpx.HTTPError as e:
-            logger.error(f"HTTP error fetching contest data: {e}")
+            logger.exception("HTTP error fetching contest data")
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to fetch contest data for {contest_name}",
             ) from e
         except Exception as e:
-            logger.error(f"Error fetching contest data: {e}")
+            logger.exception("Error fetching contest data")
             raise HTTPException(
                 status_code=503,
                 detail=f"Failed to fetch contest data for {contest_name}",
@@ -236,7 +236,7 @@ async def find_latest_contests(
             cache.set("latest_contests", slugs)
         return slugs
     except Exception as e:
-        logger.error(f"Error finding latest contests: {e}")
+        logger.exception("Error finding latest contests")
         raise HTTPException(
             status_code=500, detail="Failed to fetch latest contest data"
         ) from e

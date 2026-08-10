@@ -67,8 +67,8 @@ async def lifespan(app: FastAPI):
         scaler = joblib.load(SCALER_PATH)
         async_client = httpx.AsyncClient(timeout=30.0)
         logger.info("Successfully loaded model, scaler, and HTTP client")
-    except Exception as e:
-        logger.error(f"Failed to load model or scaler: {e}")
+    except Exception:
+        logger.exception("Failed to load model or scaler")
         raise
 
     yield
@@ -84,7 +84,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="1.0.0",
+    version="2.2.0",
     lifespan=lifespan,
 )
 
@@ -215,11 +215,14 @@ async def predict(input_data: PredictionInput):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Unexpected error in predict endpoint: {e}")
+        logger.exception("Unexpected error in predict endpoint")
         raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
-@app.get("/api/contestData")
+@app.get(
+    "/api/contestData",
+    responses={500: {"description": "Failed to get contest data"}},
+)
 async def get_contest_data():
     """Get latest contest information."""
     try:
@@ -228,7 +231,7 @@ async def get_contest_data():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in contestData endpoint: {e}")
+        logger.exception("Error in contestData endpoint")
         raise HTTPException(status_code=500, detail="Failed to get contest data") from e
 
 
