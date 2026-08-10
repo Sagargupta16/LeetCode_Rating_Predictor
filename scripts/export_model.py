@@ -29,25 +29,14 @@ logger = logging.getLogger(__name__)
 SUPPORTED_ACTIVATIONS = {"relu", "linear"}
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-
-def _checked_output_path(path: Path) -> Path:
-    """Resolve an output path and refuse anything outside the repository.
-
-    The paths come from CLI arguments and are used to create directories and
-    write files, so confine them rather than trusting the caller.
-    """
-    resolved = (
-        (REPO_ROOT / path).resolve() if not path.is_absolute() else path.resolve()
-    )
-    if not resolved.is_relative_to(REPO_ROOT):
-        raise ValueError(
-            f"refusing to write outside the repository: {resolved} "
-            f"is not inside {REPO_ROOT}"
-        )
-    return resolved
+# Output locations are fixed rather than CLI arguments: the API reads exactly
+# these two paths, so there is nothing to configure and no caller-supplied path
+# ever reaches mkdir or a write.
+WEIGHTS_OUT = REPO_ROOT / "models" / "weights.npz"
+SCALER_OUT = REPO_ROOT / "models" / "scaler.json"
 
 
-def export_weights(model_path: Path, out_path: Path) -> None:
+def export_weights(model_path: Path) -> None:
     """Flatten the model's Dense layers into a single .npz archive."""
     import tensorflow as tf
 
@@ -88,19 +77,18 @@ def export_weights(model_path: Path, out_path: Path) -> None:
     input_dim = int(arrays["w0"].shape[0])
     meta = {"activations": activations, "input_dim": input_dim, "layers": index}
 
-    target = _checked_output_path(out_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(target, meta=json.dumps(meta), **arrays)
+    WEIGHTS_OUT.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(WEIGHTS_OUT, meta=json.dumps(meta), **arrays)
     logger.info(
         "wrote %s (%d Dense layers, input_dim=%d, activations=%s)",
-        target,
+        WEIGHTS_OUT,
         index,
         input_dim,
         activations,
     )
 
 
-def export_scaler(scaler_path: Path, out_path: Path) -> None:
+def export_scaler(scaler_path: Path) -> None:
     """Reduce the pickled MinMaxScaler to its two transform vectors.
 
     ``MinMaxScaler.transform`` is ``x * scale_ + min_``, so nothing else is
@@ -124,22 +112,19 @@ def export_scaler(scaler_path: Path, out_path: Path) -> None:
         "min": np.asarray(scaler.min_, dtype=np.float64).tolist(),
     }
 
-    target = _checked_output_path(out_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    logger.info("wrote %s (%d features)", target, payload["n_features_in"])
+    SCALER_OUT.parent.mkdir(parents=True, exist_ok=True)
+    SCALER_OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    logger.info("wrote %s (%d features)", SCALER_OUT, payload["n_features_in"])
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="model.keras", type=Path)
     parser.add_argument("--scaler", default="scaler.save", type=Path)
-    parser.add_argument("--weights-out", default="models/weights.npz", type=Path)
-    parser.add_argument("--scaler-out", default="models/scaler.json", type=Path)
     args = parser.parse_args()
 
-    export_weights(args.model, args.weights_out)
-    export_scaler(args.scaler, args.scaler_out)
+    export_weights(args.model)
+    export_scaler(args.scaler)
 
 
 if __name__ == "__main__":
