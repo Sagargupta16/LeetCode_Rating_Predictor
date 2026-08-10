@@ -19,9 +19,9 @@ jobs:
           python-version: "3.12"
       - run: uv sync --locked --no-install-project --no-build
       - name: Ruff
-        run: uv run --no-sync ruff check .
+        run: uv run --no-sync --no-build ruff check .
       - name: Pytest
-        run: uv run --no-sync python -m pytest -q
+        run: uv run --no-sync --no-build python -m pytest -q
 
   node:
     runs-on: ubuntu-latest

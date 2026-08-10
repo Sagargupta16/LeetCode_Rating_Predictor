@@ -1,4 +1,6 @@
-FROM python:3.14-slim
+# TensorFlow 2.21 publishes no 3.14 wheels, so this must track render.yaml /
+# runtime.txt at 3.12.
+FROM python:3.12-slim
 WORKDIR /app
 
 # Build args
@@ -10,19 +12,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
 
 # Optionally install heavy ML dependencies at build time
 COPY requirements-ml.txt ./
 RUN if [ "${INSTALL_ML}" = "1" ]; then \
-    pip install --no-cache-dir -r requirements-ml.txt; \
+    pip install --no-cache-dir --only-binary :all: -r requirements-ml.txt; \
     fi
 
 COPY . .
 
 # Build client if present, then create non-root user
 RUN if [ -d "./client" ]; then \
-    cd client && npm ci && npm run build && cd ..; \
+    cd client && npm ci --ignore-scripts && npm run build && cd ..; \
     fi && \
     useradd --create-home appuser
 USER appuser
