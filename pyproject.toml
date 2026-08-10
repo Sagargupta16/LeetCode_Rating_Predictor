@@ -1,6 +1,6 @@
 [project]
 name = "leetcode-rating-predictor"
-version = "2.2.0"
+version = "2.3.0"
 description = "Neural network LeetCode contest rating predictor (FastAPI + TensorFlow)"
 requires-python = ">=3.12"
 license = "MIT"
@@ -8,10 +8,8 @@ dependencies = [
     "fastapi==0.141.1",
     "pydantic==2.13.4",
     "numpy==2.5.2",
-    "joblib==1.5.3",
     "requests==2.34.2",
     "uvicorn[standard]==0.52.1",
-    "scikit-learn==1.9.0",
     "httpx==0.28.1",
     "tqdm==4.70.0",
     "redis==8.1.0",
@@ -22,11 +20,14 @@ dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
 ]
-# Heavy ML extras, mirroring requirements-ml.txt. Kept as an extra so uv.lock
-# records hashes for them and the Docker build can install them verifiably.
+# Training-only extras, mirroring requirements-ml.txt. Kept as an extra so
+# uv.lock records hashes for them and the Docker build can install them
+# verifiably. Never imported by the served application.
 ml = [
     "tensorflow==2.21.0",
     "keras==3.15.1",
+    "scikit-learn==1.9.0",
+    "joblib==1.5.3",
 ]
 
 # Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
@@ -58,11 +59,12 @@ line-length = 88
 
 [tool.isort]
 profile = "black"
+skip_glob = [".venv*/*", "venv/*", "client/*", "notebooks/*"]
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
-exclude = ["venv", "__pycache__", "client", "notebooks"]
+exclude = [".venv", ".venv-runtime", "venv", "__pycache__", "client", "notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C", "N", "B", "S"]

@@ -1,12 +1,14 @@
 # Runtime dependencies. Human-editable pins; requirements.lock.txt is the
 # generated, hash-pinned resolution used by the Docker build (see CONTRIBUTING.md).
+#
+# No ML framework here on purpose: inference runs on numpy against the exported
+# artifacts in models/. TensorFlow, Keras, scikit-learn and joblib are only
+# needed to train and export, and live in requirements-ml.txt.
 fastapi==0.141.1
 pydantic==2.13.4
 numpy==2.5.2
-joblib==1.5.3
 requests==2.34.2
 uvicorn[standard]==0.52.1
-scikit-learn==1.9.0
 httpx==0.28.1
 tqdm==4.70.0
 redis==8.1.0

@@ -2,10 +2,11 @@ services:
   - type: web
     name: leetcode-rating-predictor
     runtime: python
+    # No ML framework is installed: inference runs on numpy against the
+    # exported artifacts in models/. See scripts/export_model.py.
     buildCommand: >
       pip install -r requirements.txt &&
-      pip install -r requirements-ml.txt &&
-      cd client && npm ci && npm run build
+      cd client && npm ci --ignore-scripts && npm run build
     startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: PYTHON_VERSION

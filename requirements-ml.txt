@@ -1,4 +1,7 @@
-# Heavy ML dependencies (install only when training or running model locally).
+# Training-only dependencies: needed to retrain the model and to run
+# scripts/export_model.py, never to serve predictions.
 # requirements-ml.lock.txt is the generated, hash-pinned equivalent.
 tensorflow==2.21.0
 keras==3.15.1
+scikit-learn==1.9.0
+joblib==1.5.3
