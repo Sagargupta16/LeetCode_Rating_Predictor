@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.3.1] - 2026-09-02
+
+### Fixed
+
+- **`Refresh training data` workflow failed on every scheduled run since
+  2026-08-17.** `peter-evans/create-pull-request` v7.0.8 runs
+  `git remote prune origin` against the credentials `actions/checkout@v6`
+  persists, which sends a duplicate `Authorization` header that GitHub rejects
+  with HTTP 400 (`fatal: ... error: 400`, exit 128). Bumped to v8.1.1
+  (SHA-pinned), which targets checkout@v6 and no longer prunes on hosted
+  runners. The data-fetch step itself succeeded on every failed run; only PR
+  creation broke.
+
+### Security
+
+- Triaged the 12 Dependabot alerts (8 keras, 4 python-multipart) that reopened
+  against the stale `requirements.txt` dependency-graph snapshot
+  (keras 3.13.2, python-multipart 0.0.27, tensorflow 2.20.0 -- see the note in
+  `.github/dependabot.yml`). All are false positives at HEAD: keras is pinned
+  at 3.15.1 (>= every first-patched version, 3.14.0/3.15.0) in
+  `requirements-ml.txt`, the `ml` extra and both lock exports, and
+  `python-multipart` was removed entirely in 2.2.0. Dismissed each alert with
+  a per-alert justification. No dependency changed. If the frozen snapshot
+  keeps spawning alerts, the remaining fixes are repo-admin actions: disable
+  and re-enable the dependency graph in Settings > Security, or ask GitHub
+  support to purge the stale snapshot.
+
 ## [2.3.0] - 2026-08-10
 
 ### Changed
