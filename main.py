@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="2.3.0",
+    version="2.3.1",
     lifespan=lifespan,
 )
 
