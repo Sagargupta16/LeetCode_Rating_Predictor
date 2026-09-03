@@ -24,6 +24,12 @@ jobs:
 
       - run: uv sync --locked --no-install-project --no-build
 
+      # The script refuses to overwrite data/data.json when a run comes back
+      # with far fewer records than are already committed, and exits non-zero
+      # instead. That fails this job and skips PR creation, which is the point:
+      # a throttled fetch used to sail through as a PR that deleted half the
+      # training set. Re-run the workflow; pass --force only for an intended
+      # shrink.
       - name: Fetch latest contest data
         run: uv run --no-sync --no-build python scripts/update_data.py
 

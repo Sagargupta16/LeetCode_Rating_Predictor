@@ -208,11 +208,30 @@ and 13, so improving that source is the most promising accuracy work left.
 ## Updating Training Data
 
 ```bash
-python scripts/update_data.py
-# Enter number of users when prompted (e.g., 5000)
+python scripts/update_data.py                     # 8,000 users by default
+python scripts/update_data.py --users 10000       # widen the slice
+python scripts/update_data.py --min-retention 0.5 # allow a bigger shrink
 ```
 
 This fetches contest history via GraphQL and writes to `data/data.json`.
+
+Two guards worth knowing about, both there because the weekly job once opened a
+PR that halved the training set:
+
+- **Retention floor.** A run that keeps less than `--min-retention` (default
+  95%) of the records already committed aborts instead of writing, and exits
+  non-zero. Contest histories only grow and `usernames.json` is fixed, so a much
+  smaller result means the fetch was throttled, not that the data shrank. Pass
+  `--force` when a shrink is genuinely intended.
+- **User cap.** `data/data.json` is committed, so it lives under GitHub's 100 MB
+  per-file hard limit. At roughly 8.3 KB per contributing user, all 43,158
+  usernames would produce about a 307 MB file that cannot be pushed. The default
+  of 8,000 lands near 57 MB. The script prints the written size and warns past
+  90 MB.
+
+Failed fetches are reported separately from accounts that genuinely have no
+contest history, so throttling shows up in the summary rather than hiding as
+missing data.
 
 ## Model Retraining
 
@@ -272,7 +291,7 @@ python main.py
 | `Module not found` | `pip install -r requirements-ml.txt` |
 | GPU not detected (Windows) | Use WSL2 (see above) |
 | Out of memory | Reduce `batch_size` in notebook (default: 64) |
-| Poor performance | Fetch more data: `python scripts/update_data.py` with more users |
+| Poor performance | Fetch more data: `python scripts/update_data.py --users 10000` |
 
 ## Development
 
