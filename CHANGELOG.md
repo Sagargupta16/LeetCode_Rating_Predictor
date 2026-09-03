@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.3.2] - 2026-09-03
+
+### Fixed
+
+- **The weekly data refresh could delete half the training set without failing.**
+  Its first successful run (PR #162) came back with 123,513 records against the
+  244,950 already committed, and every check passed. Three separate causes:
+  - `scripts/update_data.py` asked interactively how many users to process, so
+    under CI `input()` raised `EOFError` and it silently fell back to
+    `min(5000, len(usernames))`. The committed dataset was built from 6,830
+    contributing users, so the cron could never reproduce it -- even a flawless
+    run over 5,000 users lands ~27% short. `--users` now defaults to 8,000.
+  - A throttled fetch was indistinguishable from an account with no contests:
+    any non-200 returned `[]`, exactly like an empty history. 1,560 of 5,000
+    users "failed" that way. Retryable statuses (429, 5xx) and network errors
+    now retry with exponential backoff honouring `Retry-After`, and a failed
+    fetch returns `None` so the summary counts failures apart from empty
+    accounts.
+  - Nothing compared the new dataset against the old before overwriting it.
+    A run retaining less than `--min-retention` (default 95%) of the committed
+    records now aborts with a non-zero exit instead of writing, which fails the
+    workflow rather than opening a data-destroying PR. `--force` overrides it.
+- `data/data.json` is written through a temp file and `os.replace`, so an
+  interrupted run can no longer truncate the committed dataset.
+- Dropped a `time.sleep(0.05)` in the result-consuming loop. All futures are
+  submitted up front, so it throttled nothing and only added latency -- 250s of
+  pure sleep across 5,000 users.
+
+### Added
+
+- `scripts/update_data.py` flags: `--users`, `--workers`, `--min-retention`,
+  `--force`. The user cap is bounded by GitHub's 100 MB per-file hard limit:
+  at ~8.3 KB per contributing user, all 43,158 usernames would produce roughly
+  a 307 MB `data.json` that could never be pushed. The script logs the written
+  file size and warns past 90 MB.
+
 ## [2.3.1] - 2026-09-02
 
 ### Fixed
