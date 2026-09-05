@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.3.3] - 2026-09-05
+
+### Fixed
+
+- **The weekly refresh aborted on a completely healthy run.** The 2026-09-03 run
+  fetched all 8,000 users with **zero** failures, collected 197,991 records
+  against the 244,950 committed, and tripped the 95% retention floor at 80.8%.
+  The floor was right; `DEFAULT_MAX_USERS` was wrong. It was sized on an assumed
+  ~90% contribution rate, but the measured rate is **68.2%**: 5,460 of 8,000
+  users contributed and 2,540 have no contest history at all, so a third of
+  `usernames.json` belongs to accounts that never entered a contest. 8,000
+  attempts can therefore never reach the committed record count. Raised to
+  **12,000** (~8,190 contributors, ~297K records, ~65 MB), which clears the
+  dataset by 21% and stays well under GitHub's 100 MB per-file limit. The
+  constant now carries the measured table so the next change starts from data.
+- **The abort message blamed the wrong thing.** It read "0 of 8000 fetches
+  failed, which usually means LeetCode throttled the run" -- on a run with no
+  failures. The diagnosis now branches: with failures it points at throttling and
+  suggests a re-run; with none it says plainly that throttling is not the cause
+  and that `--users` is too low, explicitly steering away from lowering the floor.
+
 ## [2.3.2] - 2026-09-03
 
 ### Fixed

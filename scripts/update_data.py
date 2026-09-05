@@ -45,14 +45,32 @@ DEFAULT_MIN_RETENTION = 0.95
 
 # How many usernames to fetch when --users is not given.
 #
-# data/data.json is committed, so it lives under GitHub's 100 MB per-file hard
-# limit. At the current shape (~231 bytes per record, ~36 records per user, so
-# ~8.3 KB per contributing user) that ceiling lands near 12,600 users, and
-# usernames.json holds 43,158 -- fetching all of them would produce roughly a
-# 307 MB file that cannot be pushed at all. 8,000 attempts lands around 57 MB,
-# which clears the 6,830 users behind the current dataset without approaching
-# the limit. Raise this only after checking the resulting file size.
-DEFAULT_MAX_USERS = 8000
+# Sized from a real run rather than a guess. The 2026-09-03 run measured:
+#
+#   8,000 attempted -> 5,460 contributed, 2,540 had no contest history at all
+#   contribution rate 68.2%, ~36.3 records per contributing user
+#
+# That 68.2% is the number that matters, and it is much lower than it looks like
+# it should be: a third of usernames.json belongs to accounts that never entered
+# a contest. An earlier version of this constant assumed ~90% and set 8,000,
+# which capped out at 197,991 records against the 244,950 already committed and
+# tripped the retention floor on a completely healthy run.
+#
+# The ceiling is GitHub's 100 MB per-file hard limit, since data/data.json is
+# committed. At ~231 bytes per record and ~8.4 KB per contributing user that cap
+# sits near 18,300 attempts, and fetching all 43,158 usernames would produce
+# roughly 307 MB, which cannot be pushed at all.
+#
+#   attempts   contributors   records    size
+#      8,000          5,460   197,991   43.7 MB   under the committed dataset
+#     10,000          6,825   247,489   54.6 MB   clears it by only 1%
+#     12,000          8,190   296,986   65.5 MB   21% headroom  <- chosen
+#     14,000          9,555   346,484   76.4 MB   nearing the 90 MB warning
+#
+# 12,000 leaves enough headroom above the retention floor that ordinary variance
+# does not abort the run. Re-derive these numbers from a real run before raising
+# it, and check the logged file size.
+DEFAULT_MAX_USERS = 12000
 GRAPHQL_QUERY = """
 query userContestRankingInfo($username: String!) {
     userContestRankingHistory(username: $username) {
@@ -353,13 +371,30 @@ def main() -> int:
     if existing:
         logger.info(f"Existing records: {existing} (this run keeps {retained:.1%})")
     if retained < args.min_retention and not args.force:
+        # Name the actual cause. Blaming throttling on a run with zero failures
+        # sends you chasing the wrong thing, which is exactly what the previous
+        # wording did: the 2026-09-03 run reported "0 of 8000 fetches failed,
+        # which usually means LeetCode throttled the run".
+        if tally["failed"] > 0:
+            cause = (
+                f"{tally['failed']} of {len(usernames)} fetches failed, which "
+                "usually means LeetCode throttled the run, so re-running it "
+                "should recover the missing users."
+            )
+        else:
+            cause = (
+                f"No fetches failed, so this was a healthy run and throttling is "
+                f"not the cause. {tally['successful']} of {len(usernames)} users "
+                f"contributed records and {tally['empty']} have no contest "
+                "history, so --users is simply too low to reach the committed "
+                "record count. Raise --users (or DEFAULT_MAX_USERS) rather than "
+                "lowering the floor."
+            )
         logger.error(
             f"Refusing to overwrite {output_file}: {len(all_data)} new records "
             f"against {existing} on disk ({retained:.1%}, under the "
-            f"{args.min_retention:.0%} floor). {tally['failed']} of "
-            f"{len(usernames)} fetches failed, which usually means LeetCode "
-            "throttled the run. Re-run it, or pass --force if the shrink is "
-            "intended."
+            f"{args.min_retention:.0%} floor). {cause} Pass --force only if the "
+            "shrink is genuinely intended."
         )
         return 1
 
