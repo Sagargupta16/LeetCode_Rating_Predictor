@@ -1,6 +1,6 @@
 [project]
 name = "leetcode-rating-predictor"
-version = "2.3.2"
+version = "2.3.3"
 description = "Neural network LeetCode contest rating predictor (FastAPI + TensorFlow)"
 requires-python = ">=3.12"
 license = "MIT"
