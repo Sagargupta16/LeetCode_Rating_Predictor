@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.3.4] - 2026-09-21
+
+### Security
+
+- **anyio 4.13.0 to 4.14.2**, closing Dependabot alerts #128, #129, #131 and #133.
+  Two advisories: a critical one where `TLSStream` encodes host names with IDNA
+  2003, which can let a certificate for a different name validate as a match, and
+  a medium one where process-pool workers block indefinitely on undrained stderr.
+  anyio is transitive, reaching the tree through the served FastAPI stack, so the
+  fix is a lockfile move with no pin change in `requirements*.txt`.
+- **Fixed lockfile drift that hid half the exposure.** `requirements.lock.txt`
+  already carried 4.14.2 while `uv.lock` and `requirements-ml.lock.txt` were still
+  on 4.13.0, so an earlier per-manifest fix had landed on one file and left the
+  other two behind. All three now agree, regenerated with the documented
+  `uv lock` plus both `uv export` commands. Re-exporting `requirements.lock.txt`
+  produced no diff, which confirms the export is reproducible and only anyio moved.
+
 ## [2.3.3] - 2026-09-05
 
 ### Fixed
