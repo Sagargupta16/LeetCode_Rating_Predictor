@@ -5,13 +5,13 @@ description = "Neural network LeetCode contest rating predictor (FastAPI + Tenso
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
-    "fastapi==0.141.1",
-    "pydantic==2.13.4",
-    "numpy==2.5.2",
+    "fastapi==0.142.2",
+    "pydantic==2.13.5",
+    "numpy==2.5.3",
     "requests==2.34.2",
-    "uvicorn[standard]==0.52.1",
+    "uvicorn[standard]==0.54.0",
     "httpx==0.28.1",
-    "tqdm==4.70.0",
+    "tqdm==4.70.1",
     "redis==8.1.0",
 ]
 
@@ -26,8 +26,8 @@ dev = [
 ml = [
     "tensorflow==2.21.0",
     "keras==3.15.1",
-    "scikit-learn==1.9.0",
-    "joblib==1.5.3",
+    "scikit-learn==1.9.1",
+    "joblib==1.6.0",
 ]
 
 # Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
@@ -35,9 +35,9 @@ ml = [
 [dependency-groups]
 dev = [
     "black==26.5.1",
-    "ruff==0.16.2",
+    "ruff==0.16.10",
     "isort==8.0.1",
-    "pre-commit==4.6.1",
+    "pre-commit==4.6.2",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
 ]
