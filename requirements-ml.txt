@@ -3,5 +3,5 @@
 # requirements-ml.lock.txt is the generated, hash-pinned equivalent.
 tensorflow==2.21.0
 keras==3.15.1
-scikit-learn==1.9.0
-joblib==1.5.3
+scikit-learn==1.9.1
+joblib==1.6.0
