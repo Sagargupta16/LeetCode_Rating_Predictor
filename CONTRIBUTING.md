@@ -13,13 +13,21 @@ to retrain or re-export the model.
 ## Model artifacts
 
 The API reads `models/weights.npz` and `models/scaler.json`, which are generated
-from `model.keras` and `scaler.save`. After retraining, regenerate them in the
-same commit as the new model:
+from `model.keras` and `scaler.save`. Retrain with `scripts/train.py` (split by
+user, so the held-out score is honest), export, and backtest the result against
+the current model before replacing it:
 
 ```bash
 pip install -r requirements-ml.txt
+python scripts/train.py --loss huber    # writes model.keras, scaler.save, models/metrics.json
 python scripts/export_model.py
+python scripts/backtest.py --histories /tmp/histories.json   # new model
+python scripts/backtest.py --histories /tmp/histories.json     --weights old/weights.npz --scaler old/scaler.json       # previous model, same users
 ```
+
+`--histories` caches the fetched contest histories, so both runs score the same
+contests. Only ship a model that wins on the backtest, and commit the
+regenerated artifacts and `models/metrics.json` together.
 
 `tests/test_model_artifacts.py` pins the prediction for a fixed input. A
 legitimate retrain will change it -- update `GOLDEN_PREDICTION` alongside the new
@@ -39,11 +47,14 @@ pre-commit install
 ## Testing
 
 ```bash
-# Backend (59 tests)
+# Backend (68 tests)
 python -m pytest tests/
 
 # Frontend (19 tests)
 cd client && npm test
+
+# Browser extension helpers (8 tests)
+node --test extension/core.test.js
 ```
 
 All tests must pass before submitting a PR.
@@ -74,7 +85,8 @@ them in sync.
 - `app/` -- backend package (config, schemas, services, utils)
 - `main.py` -- FastAPI entry point
 - `client/` -- React frontend
-- `scripts/` -- utility scripts (data fetching, model download)
+- `extension/` -- Chrome extension for LeetCode ranking pages (no build step)
+- `scripts/` -- data fetching, training, export, backtest, extension packaging
 - `notebooks/` -- training notebook
 - `tests/` -- pytest test suite
 

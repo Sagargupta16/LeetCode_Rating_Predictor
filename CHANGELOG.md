@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.4.0] - 2026-10-18
+
+### Added
+
+- **Browser extension** (`extension/`, Manifest V3). Adds a **Predicted**
+  column to LeetCode contest ranking pages, reading ranks from the page's own
+  ranking JSON and predictions from the API through the service worker, with a
+  shared queue that waits out the API's 429s. An options page points it at a
+  self-hosted API. `scripts/package_extension.py` builds the store zip. Checked
+  end to end in Chromium on the live Weekly Contest 524 ranking: 23 of 23 rows
+  predicted on pages 3 and 4.
+- **`scripts/backtest.py`.** Replays the last 5 rated contests (past year) of
+  users outside the training slice, through the same feature code the API
+  serves. The weekly data refresh now runs it and commits
+  [docs/backtest.md](docs/backtest.md) in the same PR.
+- **`scripts/train.py`.** Retrains with a train/validation/test split by user
+  (user boundaries recovered from the rating chain in `data/data.json`) and the
+  scaler fit on training users only, and writes `models/metrics.json`.
+- **First-contest predictions.** Accounts with no rated contest yet now get a
+  prediction from a 1500 rating and an empty history, which is how the training
+  data starts every user, instead of a 400. Unknown usernames still return 400.
+- **Keep-warm workflow** pinging `/api/health` every 10 minutes during the
+  weekly and biweekly contest windows (12 hours a week).
+- README: desktop, phone and extension screenshots, a Deploy to Render button,
+  and a measured cold start (31 s on 2026-10-18).
+
+### Changed
+
+- **Retrained model (Huber loss, split by user, 242,108 training records).**
+  On two backtest samples of 50 unseen users, MAE went from 7.85 to 7.38 (172
+  contests) and from 8.89 to 8.71 (171 contests); RMSE from 9.87 to 9.44 and
+  from 13.93 to 13.18. Held-out users: MAE 14.14 (the previous model scores
+  14.22 on the same users). `GOLDEN_PREDICTION` is now 55.0113.
+- **One feature module for the API and the backtest**
+  (`app/services/features.py`). The served history summary now matches
+  `scripts/update_data.py` exactly: placeholder history entries with rank 0 no
+  longer count as a 0% solve rate, and the recent finish time takes the last 5
+  contests before dropping zero finish times. A test rebuilds the training
+  record and checks all 15 features. Feature 5 now uses the training definition
+  (position in the history).
+- The web app shows the pre-contest rating to 2 decimals.
+
+### Docs
+
+- README: the 7.84 test MAE headline is replaced by the backtest and held-out
+  user numbers. It came from a random record split, and the 2.3.5 model scores
+  14.22 when split by user on current data.
+- README: the "feature 5 skew" note was wrong. The contest history only lists
+  attended contests (17,329 of 17,329 entries in 664 sampled histories), so the
+  served and trained values already agreed.
+- README and CONTRIBUTING: retraining now goes through `scripts/train.py`, then
+  a backtest against the current model before replacing it. Test counts are 68
+  backend, 19 frontend and 8 extension.
+
 ## [2.3.5] - 2026-10-18
 
 ### Fixed

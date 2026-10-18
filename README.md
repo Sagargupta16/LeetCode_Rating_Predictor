@@ -6,7 +6,9 @@
 ![Last Commit](https://img.shields.io/github/last-commit/Sagargupta16/LeetCode_Rating_Predictor?style=flat-square&cacheSeconds=86400)
 ![Demo](https://img.shields.io/badge/demo-live-brightgreen?style=flat-square)
 
-**[View Live Demo](https://leetcode-rating-predictor.onrender.com/)** -- free-tier instance, first load may take ~1 minute to wake
+**[View Live Demo](https://leetcode-rating-predictor.onrender.com/)** -- free-tier instance: a cold start took 31 s on 2026-10-18 (0.3 s once warm). It is kept awake on contest days, see [CI Pipeline](#ci-pipeline).
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Sagargupta16/LeetCode_Rating_Predictor)
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.142.2-green.svg)](https://fastapi.tiangolo.com)
@@ -14,7 +16,15 @@
 [![NumPy](https://img.shields.io/badge/inference-NumPy-orange.svg)](https://numpy.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Predict your LeetCode contest rating changes using a Dense neural network trained on 121,000+ contest records. Enter your username, hit **Auto-fill** to pull your real ranks from past contests, and get a prediction.
+Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page.
+
+On recent contests of users the model never trained on, it is off by **7.38 and 8.71 rating points** on average in two independent samples of 50 users, and gets the direction of the change right 89.5% and 86.5% of the time. See [Performance](#performance).
+
+| Web app (desktop) | Web app (phone) |
+|---|---|
+| <img src="docs/screenshots/web-desktop.webp" alt="Prediction form with two contests and their predicted rating changes" width="480"> | <img src="docs/screenshots/web-mobile.webp" alt="The same prediction on a 390 px wide phone screen" width="220"> |
+
+![Browser extension: a Predicted column on the Weekly Contest 524 ranking page](docs/screenshots/extension-ranking.webp)
 
 The trained network is a small Dense stack, so the API evaluates it with NumPy against exported weights. Serving needs no TensorFlow, Keras, scikit-learn or joblib: the runtime environment is ~65 MB instead of ~1.8 GB, and those frameworks are only required to retrain.
 
@@ -44,12 +54,20 @@ LeetCode only publishes rating changes once a contest has been rated, well after
 it ends. This predicts the change from your rank as soon as you know it, using a
 model trained on real contest histories rather than a hand-tuned Elo formula.
 
+LeetCode's rating is an Elo-style formula, and an exact replica needs the rating
+of every participant: a ranklist scrape of 30k+ rows per contest. This model
+needs only one user's own history, so the API answers a prediction with one
+GraphQL call, and the extension can annotate any ranking page on demand. The
+trade-off is accuracy: an exact replica gets close to zero error, this is 7 to 9
+points off on average.
+
 ## Architecture
 
 ```mermaid
 flowchart LR
     subgraph Browser
         UI[React 19 + Vite client]
+        EXT["Chrome extension<br/>on leetcode.com ranking pages"]
     end
     subgraph Server["FastAPI (uvicorn)"]
         API["/api/predict<br/>/api/userContests<br/>/api/contestData"]
@@ -59,6 +77,7 @@ flowchart LR
     end
     LC[(LeetCode GraphQL)]
     UI -->|same origin in prod| API
+    EXT -->|service worker, one request per row| API
     API --> RL
     API --> C
     API -->|user history, contest info| LC
@@ -66,8 +85,9 @@ flowchart LR
 
     subgraph Training["Offline training (manual)"]
         U[scripts/update_data.py<br/>weekly GitHub Action] --> D[(data/data.json)]
-        D --> NB[Keras notebook] --> K[model.keras + scaler.save]
+        D --> TR[scripts/train.py<br/>split by user] --> K[model.keras + scaler.save]
         K --> EX[scripts/export_model.py] --> M
+        M --> BT[scripts/backtest.py<br/>weekly, users outside training]
     end
 ```
 
@@ -84,7 +104,11 @@ flowchart LR
 |----------|-----|
 | Dense network, not LSTM | Inputs are 15 tabular features per contest, not a sequence |
 | NumPy inference instead of TensorFlow | Runtime env drops from ~1.8 GB to ~65 MB, and a golden test pins the output |
-| Participant-count features (3, 4, 13) built by the training formula at serve time | Train/serve skew on participant count inflated the backtest error (see [Performance](#performance)); feature 5 still differs, listed there as open work |
+| One feature module (`app/services/features.py`) for the API and the backtest | The backtest scores the exact code that is served, and a test rebuilds the training record and checks all 15 features match |
+| Participant-count features (3, 4, 13) built by the training formula at serve time | Train/serve skew on participant count tripled the backtest error (see [Performance](#performance)) |
+| Train/test split by user, not by record | A random record split puts one user's contests on both sides and flatters the test score |
+| Huber loss instead of MSE | First contests swing 100+ points; Huber keeps those from dominating, and it won both backtests |
+| Extension calls the API from its service worker | Host permissions avoid CORS changes on the API, and one queue shares the 30/min rate limit across tabs |
 | Retention floor on the data refresh | A throttled fetch once opened a PR that halved the training set |
 | Hash-pinned lockfiles (`uv.lock`, `requirements*.lock.txt`) | Docker installs with `--require-hashes` |
 
@@ -97,21 +121,27 @@ app/                             # Backend package
   schemas.py                     #   Pydantic request/response models
   model_loader.py                #   NumPy Dense network + scaler loader
   services/
+    features.py                  #   History summary + 15-feature vector (API and backtest)
     leetcode.py                  #   LeetCode GraphQL client
     prediction.py                #   Prediction + output sanity bounds
   utils/
     cache.py                     #   TTLCache / RedisCache
     ratelimit.py                 #   Per-IP fixed-window rate limiting
 scripts/
+  train.py                       # Retrain with a by-user split -> model.keras, models/metrics.json
   export_model.py                # model.keras/scaler.save -> models/*.npz|json
+  backtest.py                    # Score the served model on recent, unseen contests
+  package_extension.py           # Zip extension/ for the Chrome Web Store
   download_model.py              # Download model artifacts from URLs
   update_data.py                 # Fetch training data from LeetCode
   check.py                       # Smoke test the running API
 notebooks/
-  LC_Contest_Rating_Predictor.ipynb  # Training notebook
+  LC_Contest_Rating_Predictor.ipynb  # Original training notebook (random split)
 data/                            # Training data
-models/                          # Exported weights + scaler (served artifacts)
-tests/                           # 59 backend tests
+models/                          # Exported weights + scaler (served) + metrics.json
+docs/                            # backtest.md (refreshed weekly) + screenshots
+extension/                       # Chrome extension (8 tests, no build step)
+tests/                           # 68 backend tests
 client/                          # React frontend (19 tests)
 ```
 
@@ -143,6 +173,10 @@ client/                          # React frontend (19 tests)
   }
 ]
 ```
+
+Accounts that exist but have no rated contest yet are predicted from a 1500
+rating and an empty history, which is how the training data starts every user.
+Unknown usernames return `400`.
 
 ### `GET /api/userContests/{username}`
 
@@ -178,6 +212,37 @@ Health check with model/scaler/client status.
 per client IP by default (`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), and
 return `429` with a `Retry-After` header once exceeded.
 
+## Browser Extension
+
+`extension/` is a Manifest V3 Chrome extension. On any
+`leetcode.com/contest/<slug>/ranking/` page it adds a **Predicted** column next
+to Score with each visible user's predicted rating change, and follows the
+page's own pagination.
+
+- **Ranks** come from the JSON the ranking page itself loads
+  (`/contest/api/ranking/<slug>/?pagination=<n>`), which works in the browser
+  even though LeetCode blocks it for servers. Its `rank` is zero-based, so the
+  extension adds 1 to match the page. leetcode.cn accounts are skipped, since
+  their histories are not on leetcode.com.
+- **Predictions** come from the API's `/api/predict`, one request per row, from
+  the service worker with at most 2 in flight. The API allows 30 a minute per
+  IP, so a second page inside a minute waits out `Retry-After` instead of
+  failing. Answers are cached for the browser session.
+- **API**: the public demo by default. The options page points it at any other
+  server (for example `http://localhost:8000`) and asks for that host's
+  permission only when you save it.
+
+Install it unpacked: open `chrome://extensions`, turn on Developer mode, click
+**Load unpacked** and pick the `extension/` folder. To build the store upload:
+
+```bash
+python scripts/package_extension.py   # dist/leetcode-rating-predictor-extension-<version>.zip
+```
+
+Verified end to end on 2026-10-18 by loading it into Chromium with Playwright on
+the live Weekly Contest 524 ranking (pages 3 and 4) against a local API: 23 of
+23 rows on each page got a prediction, including the 429 waits.
+
 ## ML Model
 
 ### Architecture
@@ -188,7 +253,8 @@ Dense neural network (replaced LSTM since input is tabular, not sequential):
 Dense(128, relu) -> Dropout(0.3) -> Dense(64, relu) -> Dropout(0.2) -> Dense(32, relu) -> Dense(1)
 ```
 
-12,417 parameters. Trained with Adam, MSE loss, early stopping.
+12,417 parameters. Trained by `scripts/train.py` with Adam, Huber loss
+(delta 10) and early stopping (62 epochs for the served model).
 
 ### Serving
 
@@ -202,7 +268,7 @@ pip install -r requirements-ml.txt
 python scripts/export_model.py
 ```
 
-The NumPy path agrees with TensorFlow to within 2.3e-05 on the served weights
+The NumPy path agrees with TensorFlow to within 7.6e-06 on the golden input
 (the scaler is exact), which is far below the two decimals the UI renders. A
 golden test in `tests/test_model_artifacts.py` pins the output so a dependency
 bump or re-export cannot silently change predictions.
@@ -231,38 +297,47 @@ Features 12 and 13 are engineered and historically carried the strongest signal.
 
 ### Performance
 
-| Metric | Value |
-|--------|-------|
-| Test MAE | **7.84 rating points** |
-| Test RMSE | 12.26 |
-| Test MSE | 150.34 |
-| Training data | 121,241 records |
+**Backtest on recent, unseen contests** (`scripts/backtest.py`, 2026-10-18).
+Users are sampled from the part of `data/usernames.json` that the data refresh
+never fetches, so none of their contests is in the training data. Each user's
+last 5 rated contests from the past year are replayed with the history they had
+before each contest, through the same feature code the API serves. Two
+independent samples of 50 users, old and new model on identical contests:
 
-The test split is a random 10% of contest records, so one user's contests can
-land on both sides of it.
+| Sample | Contests | Model | MAE | RMSE | Median abs. error | Direction right |
+|---|---|---|---|---|---|---|
+| seed 7 | 172 | 2.3.5 (MSE, random split) | 7.85 | 9.87 | 6.81 | 89.5% |
+| seed 7 | 172 | **2.4.0 (Huber, split by user)** | **7.38** | **9.44** | **5.69** | 89.5% |
+| seed 11 | 171 | 2.3.5 | 8.89 | 13.93 | 6.68 | 87.7% |
+| seed 11 | 171 | **2.4.0** | **8.71** | **13.18** | 6.93 | 86.5% |
 
-**Backtest on recent contests (2026-10-18).** The last 5 rated contests of 16
-users (57 contests; one fixed account plus 15 sampled from `usernames.json` with
-seed 7), with each user's features rebuilt from history as of that contest:
+Always predicting 0 scores an MAE of 24.69 and 25.61 on the same two samples.
+[docs/backtest.md](docs/backtest.md) holds the latest run; the weekly data
+refresh regenerates it.
 
-| Participant count fed to features 3, 4, 13 | MAE |
-|---|---|
-| `max(rank * 1.5, 10000)`, the formula the training data uses (served since 2.3.5) | **12.46** |
-| GraphQL `registerUserNum` (30k-50k, served before 2.3.5) | 38.76 |
+**Held-out users** (`scripts/train.py`, recorded in
+[models/metrics.json](models/metrics.json)). 10% of users (818 users, 27,698
+records) never touch training or the scaler. MAE **14.14**, RMSE 22.01, against
+27.79 for always predicting 0. This set includes every first contest, where
+swings of 100+ points are common, which is why it reads higher than the
+backtest.
 
-The training data never had a real participant count: `scripts/update_data.py`
-writes `max(rank * 1.5, 10000)`. The API now uses the same formula for the
-model's features and only shows the registered count in the response. A real
-participant source would need a retrain on matching data, which is the most
-promising accuracy work left.
+**Why the old 7.84 headline is gone.** The notebook reported a test MAE of 7.84
+on 121,241 records, but it splits individual records at random, so one user's
+contests land on both sides of the split. On the current data, split by user,
+the 2.3.5 model scores 14.22 on the same held-out users as above.
 
-**Known remaining skew: feature 5 (contest count).** Training sets it to the
-contest's position in the full `userContestRankingHistory`, which also counts
-contests the user skipped. Serving uses `attendedContestsCount`, which only
-counts attended ones, so for most users the served value is lower than what the
-model saw in training. Fixing it means counting only attended contests in
-`scripts/update_data.py` and retraining, or deriving the training-style index at
-serve time; neither is done yet.
+**Train/serve skew fixed in 2.3.5.** The training data never had a real
+participant count: `scripts/update_data.py` writes `max(rank * 1.5, 10000)` for
+features 3, 4 and 13, while the API used to feed GraphQL `registerUserNum`
+(30k-50k). On a 57-contest backtest that tripled the error (MAE 38.76 against
+12.46).
+
+**Feature 5 is not skewed.** Training stores the contest's position in
+`userContestRankingHistory`, serving used the attended-contest count. The
+history only lists contests the user entered (17,329 of 17,329 entries across
+664 sampled histories were `attended`), so the two agree; 2.4.0 uses the
+training definition anyway, via the shared feature module.
 
 ## Updating Training Data
 
@@ -298,11 +373,18 @@ missing data.
 
 ```bash
 pip install -r requirements-ml.txt
-pip install jupyter
-cd notebooks
-jupyter notebook LC_Contest_Rating_Predictor.ipynb
-# Run All Cells -> model.keras and scaler.save saved to project root
+python scripts/train.py --loss huber   # CPU is enough
+python scripts/export_model.py
 ```
+
+`scripts/train.py` keeps every user on one side of the train/validation/test
+split. `data/data.json` stores no user id, but each user's records are
+contiguous and chain (a record's rating is the previous rating plus its change),
+so a break in the chain is a user boundary. On the current data the 8,182 chain
+breaks match the records that look like a first contest one for one.
+
+The notebook in `notebooks/` is the original exploratory version with a random
+record split; keep it for reference, retrain with the script.
 
 ### GPU Retraining (WSL2 + NVIDIA)
 
@@ -312,7 +394,7 @@ TensorFlow on native Windows is CPU-only. For GPU, use WSL2:
 # In Ubuntu (WSL2):
 source ~/tf-gpu/bin/activate
 cd /mnt/c/path/to/LeetCode_Rating_Predictor
-jupyter notebook notebooks/LC_Contest_Rating_Predictor.ipynb
+python scripts/train.py --loss huber
 ```
 
 Setup WSL2 GPU (one-time):
@@ -339,12 +421,12 @@ python main.py
 ### Retraining Checklist
 
 - [ ] Run `python scripts/update_data.py` for fresh data
-- [ ] Run all notebook cells
-- [ ] Verify `model.keras` and `scaler.save` created at project root
-- [ ] Check test MAE < 15 in notebook output
-- [ ] Run `python scripts/export_model.py` and update `GOLDEN_PREDICTION` in
-      `tests/test_model_artifacts.py` (see CONTRIBUTING.md)
-- [ ] Restart API server
+- [ ] Copy `models/weights.npz` and `models/scaler.json` aside (the current model)
+- [ ] Run `python scripts/train.py --loss huber` and `python scripts/export_model.py`
+- [ ] Backtest both models on the same users (`--histories` cache, see
+      CONTRIBUTING.md) and keep the new one only if it wins
+- [ ] Update `GOLDEN_PREDICTION` in `tests/test_model_artifacts.py`
+- [ ] Commit the artifacts with `models/metrics.json`, restart the API
 - [ ] Test a prediction via the UI or `python scripts/check.py`
 
 ### Troubleshooting
@@ -353,7 +435,7 @@ python main.py
 |-------|-----|
 | `Module not found` | `pip install -r requirements-ml.txt` |
 | GPU not detected (Windows) | Use WSL2 (see above) |
-| Out of memory | Reduce `batch_size` in notebook (default: 64) |
+| Out of memory | Lower `--batch-size` (default: 128) |
 | Poor performance | Fetch more data: `python scripts/update_data.py --users 14000` |
 
 ## Development
@@ -382,13 +464,27 @@ npm start    # Dev server on port 3000
 ### Testing
 
 ```bash
-# Backend (59 tests)
+# Backend (68 tests)
 python -m pytest tests/
 
 # Frontend (19 tests)
 cd client
 npm test
+
+# Extension helpers (8 tests)
+node --test extension/core.test.js
 ```
+
+### Backtest
+
+```bash
+python scripts/backtest.py                          # 50 users, last 5 contests each
+python scripts/backtest.py --seed 11 --users 100
+python scripts/backtest.py --output docs/backtest.md --histories /tmp/h.json
+```
+
+It hits live LeetCode GraphQL (one request per sampled user, about 7 minutes
+for 50 scored users, since most sampled accounts have no recent contest).
 
 ### Linting
 
@@ -454,11 +550,16 @@ MODEL_URL=gh:owner/repo/releases/tag/v1/model.keras python scripts/download_mode
 GitHub Actions:
 
 - **CI** (push and PR to `main`): `python` job runs `uv sync --locked`, Ruff and
-  pytest; `node` job runs `npm ci`, Vitest and `vite build`. Black and isort run
+  pytest; `node` job runs `npm ci`, Vitest, `vite build` and the extension tests. Black and isort run
   through pre-commit locally.
 - **CodeQL** (GitHub default setup): on push and weekly.
-- **Refresh training data**: weekly cron runs `scripts/update_data.py` and opens
-  a PR when `data/data.json` changes.
+- **Refresh training data**: weekly cron runs `scripts/update_data.py`, then
+  `scripts/backtest.py` to regenerate `docs/backtest.md`, and opens a PR with
+  both.
+- **Keep demo warm on contest days**: pings `/api/health` every 10 minutes on
+  Sunday 02:00-07:59 UTC (weekly contest at 02:30) and Saturday 14:00-19:59 UTC
+  (biweekly at 14:30). That is 12 hours a week, about 52 of the 750 free
+  instance hours a month that every free Render service on the account shares.
 - **Publish Docker Image**: on `v*` tags, pushes to Docker Hub.
 
 ## Contributing
