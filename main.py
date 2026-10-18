@@ -217,7 +217,7 @@ async def predict(input_data: PredictionInput, request: Request):
             # The model was trained on the synthetic participant count built by
             # scripts/update_data.py, never on registerUserNum, so the features
             # must use the same formula. Feeding the real count (30k-50k) puts
-            # f3, f4 and f13 outside the training distribution and tripled the
+            # f3, f4 and f13 outside the training distribution and inflated the
             # error on a backtest of recent contests.
             model_participants = max(int(contest.rank * 1.5), 10000)
             rank_percentage = (contest.rank * 100) / model_participants

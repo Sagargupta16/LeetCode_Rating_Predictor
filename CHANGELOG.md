@@ -40,6 +40,8 @@
 
 - README: added a Why section, a mermaid architecture diagram covering serving
   and offline training, a design decisions table, and the backtest numbers.
+- README: listed the remaining feature 5 skew (training counts every contest in
+  the history, serving counts attended contests only) as open work.
 - README: corrected the environment variable table (`WEIGHTS_PATH`, not
   `MODEL_PATH`, plus the rate limit, `MAX_RATING_CHANGE` and GraphQL URL
   settings), test counts (59 backend, 19 frontend), the Python requirement

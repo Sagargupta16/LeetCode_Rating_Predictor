@@ -84,7 +84,7 @@ flowchart LR
 |----------|-----|
 | Dense network, not LSTM | Inputs are 15 tabular features per contest, not a sequence |
 | NumPy inference instead of TensorFlow | Runtime env drops from ~1.8 GB to ~65 MB, and a golden test pins the output |
-| Features built by one formula in training and serving | Train/serve skew on participant count once tripled the error (see [Performance](#performance)) |
+| Participant-count features (3, 4, 13) built by the training formula at serve time | Train/serve skew on participant count inflated the backtest error (see [Performance](#performance)); feature 5 still differs, listed there as open work |
 | Retention floor on the data refresh | A throttled fetch once opened a PR that halved the training set |
 | Hash-pinned lockfiles (`uv.lock`, `requirements*.lock.txt`) | Docker installs with `--require-hashes` |
 
@@ -255,6 +255,14 @@ writes `max(rank * 1.5, 10000)`. The API now uses the same formula for the
 model's features and only shows the registered count in the response. A real
 participant source would need a retrain on matching data, which is the most
 promising accuracy work left.
+
+**Known remaining skew: feature 5 (contest count).** Training sets it to the
+contest's position in the full `userContestRankingHistory`, which also counts
+contests the user skipped. Serving uses `attendedContestsCount`, which only
+counts attended ones, so for most users the served value is lower than what the
+model saw in training. Fixing it means counting only attended contests in
+`scripts/update_data.py` and retraining, or deriving the training-style index at
+serve time; neither is done yet.
 
 ## Updating Training Data
 
