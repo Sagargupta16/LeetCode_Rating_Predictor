@@ -10,7 +10,9 @@
   shared queue that waits out the API's 429s. An options page points it at a
   self-hosted API. `scripts/package_extension.py` builds the store zip. Checked
   end to end in Chromium on the live Weekly Contest 524 ranking: 23 of 23 rows
-  predicted on pages 3 and 4.
+  predicted on pages 3 and 4, and on pages 40 and 41 (1280 and 390 px) all 25
+  rows per page line up with the header, including the 4 leetcode.cn rows that
+  get an empty cell.
 - **`scripts/backtest.py`.** Replays the last 5 rated contests (past year) of
   users outside the training slice, through the same feature code the API
   serves. The weekly data refresh now runs it and commits

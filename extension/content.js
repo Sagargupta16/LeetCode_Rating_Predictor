@@ -94,23 +94,25 @@
   // LeetCode renders the ranking as rows of flex cells (name, score, finish
   // time, one per question) under a header row with the same cells. Adding a
   // fixed-width cell after "Score" in every row and in the header gives the
-  // prediction its own aligned column instead of squeezing the name. If the
-  // layout ever changes, the badge falls back to sitting next to the name.
+  // prediction its own aligned column instead of squeezing the name. Every
+  // row gets the cell, including rows without a prediction, so the columns
+  // after it stay aligned. If the layout ever changes (no "Score" header or a
+  // non-numeric score), no column is added and the badge sits next to the name.
   function columnSlot(link) {
     const nameCell = link.parentElement && link.parentElement.parentElement;
     const scoreCell = nameCell && nameCell.nextElementSibling;
     if (!scoreCell || !/^\d+(\.\d+)?$/.test(scoreCell.textContent.trim())) return null;
 
-    const header = nameCell.parentElement.parentElement.parentElement.firstElementChild;
-    const headScore = header && header.children[1];
-    if (headScore && headScore.textContent.trim() === "Score") {
-      if (!headScore.nextElementSibling?.classList.contains("lrp-cell")) {
-        const head = document.createElement("div");
-        head.className = "lrp-cell lrp-head";
-        head.textContent = "Predicted";
-        head.title = "Predicted rating change (LeetCode Rating Predictor extension)";
-        headScore.insertAdjacentElement("afterend", head);
-      }
+    const table = nameCell.parentElement?.parentElement?.parentElement;
+    const headScore = table?.firstElementChild?.children[1];
+    if (!headScore) return null;
+    if (!headScore.nextElementSibling?.classList.contains("lrp-cell")) {
+      if (headScore.textContent.trim() !== "Score") return null;
+      const head = document.createElement("div");
+      head.className = "lrp-cell lrp-head";
+      head.textContent = "Predicted";
+      head.title = "Predicted rating change (LeetCode Rating Predictor extension)";
+      headScore.insertAdjacentElement("afterend", head);
     }
 
     let cell = scoreCell.nextElementSibling;
@@ -127,7 +129,7 @@
     if (cell) {
       cell.replaceChildren(badge);
     } else {
-      placeBadge(link, badge);
+      link.insertAdjacentElement("afterend", badge);
     }
   }
 
@@ -149,10 +151,16 @@
       return; // ranking not published yet or the endpoint changed
     }
 
-    for (const link of document.querySelectorAll('a[href^="/u/"]')) {
+    // Profile links include leetcode.cn accounts ("https://leetcode.cn/u/x"),
+    // which get an empty cell but no prediction. existingBadge() adds that
+    // cell, and removing the badge clears one left from a reused row.
+    for (const link of document.querySelectorAll('a[href*="/u/"]')) {
       const slug = slugFromHref(link.getAttribute("href"));
       const rank = slug && ranks.get(slug);
-      if (!rank) continue;
+      if (!rank) {
+        existingBadge(link)?.remove();
+        continue;
+      }
       const key = `${route.contest}:${slug}:${rank}`;
       const existing = existingBadge(link);
       if (existing && existing.getAttribute(BADGE_ATTR) === key) continue;

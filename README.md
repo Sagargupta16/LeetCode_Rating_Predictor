@@ -223,7 +223,8 @@ page's own pagination.
   (`/contest/api/ranking/<slug>/?pagination=<n>`), which works in the browser
   even though LeetCode blocks it for servers. Its `rank` is zero-based, so the
   extension adds 1 to match the page. leetcode.cn accounts are skipped, since
-  their histories are not on leetcode.com.
+  their histories are not on leetcode.com; their rows get an empty cell so the
+  columns after Score stay lined up.
 - **Predictions** come from the API's `/api/predict`, one request per row, from
   the service worker with at most 2 in flight. The API allows 30 a minute per
   IP, so a second page inside a minute waits out `Retry-After` instead of
