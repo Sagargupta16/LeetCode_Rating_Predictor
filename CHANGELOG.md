@@ -1,5 +1,54 @@
 # Changelog
 
+## [2.3.5] - 2026-10-18
+
+### Fixed
+
+- **Predictions fed the model a participant count it never trained on.** The
+  training data in `scripts/update_data.py` always uses `max(rank * 1.5, 10000)`
+  for features 3, 4 and 13, but the API used GraphQL `registerUserNum`
+  (30k-50k for recent contests). A backtest over the last 5 rated contests of 16
+  users (57 contests) measured MAE **38.76** with the served path and **12.46**
+  with the training formula. The API now builds those features with the training
+  formula and still returns the registered count in `total_participants` for
+  display.
+- **Rating trend and max rating were constant for every user.** The serving
+  GraphQL query did not request `rating` in `userContestRankingHistory`, so
+  feature 10 was always `0` and feature 11 always `1500` (a 2166-rated account
+  was scored as if its peak were 1500). The query now asks for it, matching the
+  training script.
+- **Self-hosted builds called the public demo.** Outside `localhost` the client
+  hard-coded `https://leetcode-rating-predictor.onrender.com`, so a Docker or
+  LAN deployment sent every request to Render. It now uses the same origin, and
+  the Vite dev server on port 3000 targets port 8000 on the same host.
+- **Python version drift.** The monthly update moved `.python-version` to
+  3.14.7 and the Docker base to `python:3.14-slim` while Render, `runtime.txt`
+  and CI stay on 3.12, and TensorFlow 2.21 ships no 3.14 wheels. Both are back
+  on 3.12, and `renovate.json` now caps Python below 3.13.
+- **Version strings.** The FastAPI app and `client/package.json` reported 2.3.1;
+  all three manifests now say 2.3.5.
+
+### Changed
+
+- Docker publish workflow actions moved to their current majors (Node 24
+  runtime): `setup-qemu-action` v4.4.0, `setup-buildx-action` v4.4.1,
+  `login-action` v4.6.0, `build-push-action` v7.4.0, still pinned by SHA.
+- Removed the unused `INSTALL_ML` build arg from `docker-compose.yml`; the
+  Dockerfile never declared it.
+
+### Docs
+
+- README: added a Why section, a mermaid architecture diagram covering serving
+  and offline training, a design decisions table, and the backtest numbers.
+- README: listed the remaining feature 5 skew (training counts every contest in
+  the history, serving counts attended contests only) as open work.
+- README: corrected the environment variable table (`WEIGHTS_PATH`, not
+  `MODEL_PATH`, plus the rate limit, `MAX_RATING_CHANGE` and GraphQL URL
+  settings), test counts (59 backend, 19 frontend), the Python requirement
+  (3.12), the data refresh default (12,000 users), the CI description, the
+  Docker instructions, and the post-retrain steps, which now include
+  `scripts/export_model.py`.
+
 ## [2.3.4] - 2026-09-21
 
 ### Security

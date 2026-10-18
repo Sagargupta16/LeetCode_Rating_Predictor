@@ -26,6 +26,7 @@ query userContestRankingInfo($username: String!) {
     }
     userContestRankingHistory(username: $username) {
         attended
+        rating
         problemsSolved
         totalProblems
         finishTimeInSeconds

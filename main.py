@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="2.3.1",
+    version="2.3.5",
     lifespan=lifespan,
 )
 
@@ -205,27 +205,30 @@ async def predict(input_data: PredictionInput, request: Request):
             )
             total_participants = contest_data.get("user_num", 0)
 
-            # registerUserNum from GraphQL is pre-registration count, not
-            # actual participants — use a sensible fallback when it's zero or
-            # smaller than the user's rank.  The 1.5x factor matches the
-            # synthetic participant count used to build the training data
-            # (scripts/update_data.py), avoiding train/serve skew on the
-            # rank_percentage and rating*percentile features.
+            # registerUserNum from GraphQL is a pre-registration count, not
+            # actual participants. Use a sensible fallback for display when
+            # it is zero or smaller than the user's rank.
             if total_participants == 0:
                 total_participants = max(int(contest.rank * 1.5), 10000)
 
             if contest.rank > total_participants:
                 total_participants = int(contest.rank * 1.5)
 
-            rank_percentage = (contest.rank * 100) / total_participants
+            # The model was trained on the synthetic participant count built by
+            # scripts/update_data.py, never on registerUserNum, so the features
+            # must use the same formula. Feeding the real count (30k-50k) puts
+            # f3, f4 and f13 outside the training distribution and inflated the
+            # error on a backtest of recent contests.
+            model_participants = max(int(contest.rank * 1.5), 10000)
+            rank_percentage = (contest.rank * 100) / model_participants
             log_rank = float(np.log1p(contest.rank))
-            rating_x_pct = current_rating * (contest.rank / total_participants)
+            rating_x_pct = current_rating * (contest.rank / model_participants)
             features = np.array(
                 [
                     [
                         current_rating,
                         contest.rank,
-                        total_participants,  # f1-f3
+                        model_participants,  # f1-f3
                         rank_percentage,
                         attended_contests,  # f4-f5
                         avg_solve_rate,

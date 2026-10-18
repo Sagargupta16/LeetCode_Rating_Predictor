@@ -9,7 +9,7 @@
 **[View Live Demo](https://leetcode-rating-predictor.onrender.com/)** -- free-tier instance, first load may take ~1 minute to wake
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.141.1-green.svg)](https://fastapi.tiangolo.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.142.2-green.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev)
 [![NumPy](https://img.shields.io/badge/inference-NumPy-orange.svg)](https://numpy.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -38,17 +38,55 @@ python main.py
 
 Retraining or re-exporting the model additionally needs `pip install -r requirements-ml.txt`.
 
+## Why
+
+LeetCode only publishes rating changes once a contest has been rated, well after
+it ends. This predicts the change from your rank as soon as you know it, using a
+model trained on real contest histories rather than a hand-tuned Elo formula.
+
 ## Architecture
 
-```
-React Frontend (port 3000)  -->  FastAPI Backend (port 8000)
-                                    |
-                                    +-- LeetCode GraphQL API
-                                    +-- NumPy Dense network
-                                        (models/weights.npz + scaler.json)
+```mermaid
+flowchart LR
+    subgraph Browser
+        UI[React 19 + Vite client]
+    end
+    subgraph Server["FastAPI (uvicorn)"]
+        API["/api/predict<br/>/api/userContests<br/>/api/contestData"]
+        RL[Per-IP rate limiter]
+        C[(TTL cache or Redis)]
+        M["NumPy Dense network<br/>models/weights.npz + scaler.json"]
+    end
+    LC[(LeetCode GraphQL)]
+    UI -->|same origin in prod| API
+    API --> RL
+    API --> C
+    API -->|user history, contest info| LC
+    API --> M
+
+    subgraph Training["Offline training (manual)"]
+        U[scripts/update_data.py<br/>weekly GitHub Action] --> D[(data/data.json)]
+        D --> NB[Keras notebook] --> K[model.keras + scaler.save]
+        K --> EX[scripts/export_model.py] --> M
+    end
 ```
 
-All LeetCode data is fetched via **GraphQL** (the REST ranking API is blocked).
+- FastAPI serves both the API and the built React client, so production is one
+  process on one origin. The Vite dev server (port 3000) talks to the API on
+  port 8000.
+- All LeetCode data is fetched via **GraphQL** (the REST ranking API is blocked).
+- Training and serving are split: TensorFlow is only needed offline, and the
+  served model is plain NumPy (see [Serving](#serving)).
+
+### Design decisions
+
+| Decision | Why |
+|----------|-----|
+| Dense network, not LSTM | Inputs are 15 tabular features per contest, not a sequence |
+| NumPy inference instead of TensorFlow | Runtime env drops from ~1.8 GB to ~65 MB, and a golden test pins the output |
+| Participant-count features (3, 4, 13) built by the training formula at serve time | Train/serve skew on participant count inflated the backtest error (see [Performance](#performance)); feature 5 still differs, listed there as open work |
+| Retention floor on the data refresh | A throttled fetch once opened a PR that halved the training set |
+| Hash-pinned lockfiles (`uv.lock`, `requirements*.lock.txt`) | Docker installs with `--require-hashes` |
 
 ## Project Structure
 
@@ -200,16 +238,37 @@ Features 12 and 13 are engineered and historically carried the strongest signal.
 | Test MSE | 150.34 |
 | Training data | 121,241 records |
 
-Caveat: `registerUserNum` from GraphQL is a pre-registration count, so when a
-contest reports zero participants the API substitutes `max(rank * 1.5, 10000)`
-to match how the training data was built. Participant count feeds features 3, 4
-and 13, so improving that source is the most promising accuracy work left.
+The test split is a random 10% of contest records, so one user's contests can
+land on both sides of it.
+
+**Backtest on recent contests (2026-10-18).** The last 5 rated contests of 16
+users (57 contests; one fixed account plus 15 sampled from `usernames.json` with
+seed 7), with each user's features rebuilt from history as of that contest:
+
+| Participant count fed to features 3, 4, 13 | MAE |
+|---|---|
+| `max(rank * 1.5, 10000)`, the formula the training data uses (served since 2.3.5) | **12.46** |
+| GraphQL `registerUserNum` (30k-50k, served before 2.3.5) | 38.76 |
+
+The training data never had a real participant count: `scripts/update_data.py`
+writes `max(rank * 1.5, 10000)`. The API now uses the same formula for the
+model's features and only shows the registered count in the response. A real
+participant source would need a retrain on matching data, which is the most
+promising accuracy work left.
+
+**Known remaining skew: feature 5 (contest count).** Training sets it to the
+contest's position in the full `userContestRankingHistory`, which also counts
+contests the user skipped. Serving uses `attendedContestsCount`, which only
+counts attended ones, so for most users the served value is lower than what the
+model saw in training. Fixing it means counting only attended contests in
+`scripts/update_data.py` and retraining, or deriving the training-style index at
+serve time; neither is done yet.
 
 ## Updating Training Data
 
 ```bash
-python scripts/update_data.py                     # 8,000 users by default
-python scripts/update_data.py --users 10000       # widen the slice
+python scripts/update_data.py                     # 12,000 users by default
+python scripts/update_data.py --users 14000       # widen the slice
 python scripts/update_data.py --min-retention 0.5 # allow a bigger shrink
 ```
 
@@ -226,7 +285,7 @@ PR that halved the training set:
 - **User cap.** `data/data.json` is committed, so it lives under GitHub's 100 MB
   per-file hard limit. At roughly 8.3 KB per contributing user, all 43,158
   usernames would produce about a 307 MB file that cannot be pushed. The default
-  of 8,000 lands near 57 MB. The script prints the written size and warns past
+  of 12,000 lands near 65 MB. The script prints the written size and warns past
   90 MB.
 
 Failed fetches are reported separately from accounts that genuinely have no
@@ -270,8 +329,10 @@ pip install "tensorflow[and-cuda]==2.21.0" joblib scikit-learn numpy
 
 ### After Retraining
 
-Restart the server to pick up the new model:
+The API serves the exported NumPy artifacts, not `model.keras`, so export them
+and restart:
 ```bash
+python scripts/export_model.py
 python main.py
 ```
 
@@ -281,6 +342,8 @@ python main.py
 - [ ] Run all notebook cells
 - [ ] Verify `model.keras` and `scaler.save` created at project root
 - [ ] Check test MAE < 15 in notebook output
+- [ ] Run `python scripts/export_model.py` and update `GOLDEN_PREDICTION` in
+      `tests/test_model_artifacts.py` (see CONTRIBUTING.md)
 - [ ] Restart API server
 - [ ] Test a prediction via the UI or `python scripts/check.py`
 
@@ -291,13 +354,13 @@ python main.py
 | `Module not found` | `pip install -r requirements-ml.txt` |
 | GPU not detected (Windows) | Use WSL2 (see above) |
 | Out of memory | Reduce `batch_size` in notebook (default: 64) |
-| Poor performance | Fetch more data: `python scripts/update_data.py --users 10000` |
+| Poor performance | Fetch more data: `python scripts/update_data.py --users 14000` |
 
 ## Development
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12
 - Node.js 22+
 
 ### Backend
@@ -319,10 +382,10 @@ npm start    # Dev server on port 3000
 ### Testing
 
 ```bash
-# Backend (34 tests)
+# Backend (59 tests)
 python -m pytest tests/
 
-# Frontend (11 tests)
+# Frontend (19 tests)
 cd client
 npm test
 ```
@@ -341,14 +404,18 @@ pre-commit run --all-files
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `MODEL_PATH` | `./model.keras` | Path to model file |
-| `SCALER_PATH` | `./scaler.save` | Path to scaler file |
+| `WEIGHTS_PATH` | `./models/weights.npz` | Exported network weights |
+| `SCALER_PATH` | `./models/scaler.json` | Exported scaler |
 | `API_HOST` | `0.0.0.0` | Server bind host |
 | `API_PORT` | `8000` | Server bind port |
-| `ALLOWED_ORIGINS` | `http://localhost:3000` | CORS origins (comma-separated) |
+| `ALLOWED_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | CORS origins (comma-separated) |
 | `REDIS_URL` | *(empty)* | Redis URL for caching (optional) |
 | `CACHE_TTL` | `300` | Cache TTL in seconds |
-| `VITE_API_BASE_URL` | *(auto-detected)* | Frontend API endpoint |
+| `RATE_LIMIT_REQUESTS` | `30` | Requests per window per client IP |
+| `RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
+| `MAX_RATING_CHANGE` | `500` | Predictions beyond +/- this fail with 500 |
+| `LEETCODE_GRAPHQL_URL` | `https://leetcode.com/graphql` | LeetCode GraphQL endpoint |
+| `VITE_API_BASE_URL` | *(same origin; `:8000` on the Vite dev server)* | Frontend API endpoint |
 
 ## Deployment
 
@@ -358,8 +425,8 @@ pre-commit run --all-files
 # With Redis caching
 docker-compose up --build
 
-# Standalone with ML deps
-docker build --build-arg INSTALL_ML=1 -t leetcode-predictor .
+# Standalone (serving only; the image carries no ML framework)
+docker build -t leetcode-predictor .
 docker run -p 8000:8000 leetcode-predictor
 ```
 
@@ -384,7 +451,15 @@ MODEL_URL=gh:owner/repo/releases/tag/v1/model.keras python scripts/download_mode
 
 ## CI Pipeline
 
-GitHub Actions: **Lint** (Black, isort, Ruff) -> **Python tests** (pytest) -> **Frontend tests** (npm test, npm build) -> **Integration** (manual, downloads model + full test suite).
+GitHub Actions:
+
+- **CI** (push and PR to `main`): `python` job runs `uv sync --locked`, Ruff and
+  pytest; `node` job runs `npm ci`, Vitest and `vite build`. Black and isort run
+  through pre-commit locally.
+- **CodeQL** (GitHub default setup): on push and weekly.
+- **Refresh training data**: weekly cron runs `scripts/update_data.py` and opens
+  a PR when `data/data.json` changes.
+- **Publish Docker Image**: on `v*` tags, pushes to Docker Hub.
 
 ## Contributing
 

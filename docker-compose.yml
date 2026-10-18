@@ -2,8 +2,6 @@ services:
   backend:
     build:
       context: .
-      args:
-        INSTALL_ML: "0"
     ports:
       - "8000:8000"
     environment:

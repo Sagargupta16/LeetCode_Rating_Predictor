@@ -1,1 +1,1 @@
-{"$schema":"https://docs.renovatebot.com/renovate-schema.json","extends":["github>Sagargupta16/shared-workflows"]}
+{"$schema":"https://docs.renovatebot.com/renovate-schema.json","extends":["github>Sagargupta16/shared-workflows"],"packageRules":[{"description":"Python stays on 3.12 to match Render, runtime.txt and CI; TensorFlow 2.21 ships no 3.14 wheels","matchDepNames":["python"],"allowedVersions":"<3.13"}]}

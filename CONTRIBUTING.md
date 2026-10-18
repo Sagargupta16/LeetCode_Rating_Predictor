@@ -65,8 +65,9 @@ uv export --no-dev --no-emit-project --extra ml --format requirements-txt -o req
 ```
 
 Python is pinned to 3.12 (`runtime.txt`, `.python-version`, `render.yaml`,
-`Dockerfile`) because TensorFlow 2.21 publishes no 3.13+ wheels. Keep those in
-sync.
+`Dockerfile`, CI) to match the Render deploy, and TensorFlow 2.21 publishes no
+3.14 wheels. `renovate.json` caps Python below 3.13 so the monthly update keeps
+them in sync.
 
 ## Project Layout
 
