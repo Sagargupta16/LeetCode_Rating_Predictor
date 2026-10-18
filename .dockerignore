@@ -9,6 +9,7 @@ __pycache__
 .pytest_cache
 .ruff_cache
 notebooks
+extension
 
 # Training-only artifacts. Serving reads models/weights.npz and
 # models/scaler.json, which scripts/export_model.py derives from these.

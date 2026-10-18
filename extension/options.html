@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LeetCode Rating Predictor settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>LeetCode Rating Predictor</h1>
+      <p>
+        Open any contest ranking page on leetcode.com and a Predicted column shows
+        each user's predicted rating change.
+      </p>
+      <form id="settings">
+        <label for="apiBase">Predictor API</label>
+        <input id="apiBase" type="url" spellcheck="false" autocomplete="off" />
+        <p class="hint">
+          Defaults to the public demo. Point it at your own server (for example
+          <code>http://localhost:8000</code>) to run predictions locally.
+        </p>
+        <div class="row">
+          <button type="submit">Save</button>
+          <button type="button" id="check">Check connection</button>
+          <button type="button" id="reset">Use default</button>
+        </div>
+        <p id="status" role="status"></p>
+      </form>
+    </main>
+    <script src="core.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode Rating Predictor",
+  "version": "2.4.0",
+  "description": "Shows a predicted rating change next to every name on LeetCode contest ranking pages.",
+  "homepage_url": "https://github.com/Sagargupta16/LeetCode_Rating_Predictor",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/contest/*/ranking*"],
+      "js": ["core.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "action": {
+    "default_title": "LeetCode Rating Predictor settings",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://leetcode-rating-predictor.onrender.com/*"],
+  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]
+}
