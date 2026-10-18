@@ -323,7 +323,9 @@ const PredictionComponent = () => {
               </div>
               <div className="stat">
                 <span className="stat-label">Before</span>
-                <span className="stat-value">{r.rating_before_contest}</span>
+                <span className="stat-value">
+                  {r.rating_before_contest.toFixed(2)}
+                </span>
               </div>
               <div className="stat">
                 <span className="stat-label">Change</span>

@@ -114,7 +114,7 @@ test("displays prediction results after successful submit", async () => {
   // Verify stat values rendered
   expect(screen.getByText("1500")).toBeInTheDocument();
   expect(screen.getByText("8,000")).toBeInTheDocument();
-  expect(screen.getByText("1800")).toBeInTheDocument();
+  expect(screen.getByText("1800.00")).toBeInTheDocument();
 });
 
 test("rank input is disabled when contest is not selected", async () => {
