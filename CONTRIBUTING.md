@@ -21,12 +21,15 @@ the current model before replacing it:
 pip install -r requirements-ml.txt
 python scripts/train.py --loss huber    # writes model.keras, scaler.save, models/metrics.json
 python scripts/export_model.py
-python scripts/backtest.py --histories /tmp/histories.json   # new model
-python scripts/backtest.py --histories /tmp/histories.json     --weights old/weights.npz --scaler old/scaler.json       # previous model, same users
+python scripts/backtest.py --histories .cache/histories.json   # new model
+python scripts/backtest.py --histories .cache/histories.json \
+  --weights .cache/old/weights.npz --scaler .cache/old/scaler.json   # previous model, same users
 ```
 
 `--histories` caches the fetched contest histories, so both runs score the same
-contests. Only ship a model that wins on the backtest, and commit the
+contests. Copy the current `models/weights.npz` and `models/scaler.json` to
+`.cache/old/` before exporting the new model. Every backtest path is relative to
+the repository root and must stay inside it; `.cache/` is gitignored. Only ship a model that wins on the backtest, and commit the
 regenerated artifacts and `models/metrics.json` together.
 
 `tests/test_model_artifacts.py` pins the prediction for a fixed input. A

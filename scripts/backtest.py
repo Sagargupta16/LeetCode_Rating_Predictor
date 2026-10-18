@@ -14,14 +14,17 @@ Usage:
     python scripts/backtest.py                       # 50 users, last 5 contests
     python scripts/backtest.py --users 100 --seed 3
     python scripts/backtest.py --output docs/backtest.md
+
+Every path argument is relative to the repository root and must stay inside it.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
-import random
+import os
 import statistics
 import sys
 import time
@@ -59,6 +62,27 @@ query userContestRankingInfo($username: String!) {
     }
 }
 """
+
+
+def repo_file(value):
+    """Resolve a path argument inside the repository; refuse anything outside."""
+    root = os.path.realpath(REPO_ROOT)
+    path = os.path.realpath(os.path.join(root, value))
+    if os.path.commonpath([root, path]) != root:
+        raise SystemExit(f"{value}: path must be inside the repository")
+    return Path(path)
+
+
+def sample_order(usernames, seed):
+    """Usernames in a fixed shuffled order for ``seed``.
+
+    Sorting by a hash of the seed and the name gives the same sample on every
+    run and machine without a random number generator.
+    """
+    return sorted(
+        usernames,
+        key=lambda name: hashlib.sha256(f"{seed}:{name}".encode()).hexdigest(),
+    )
 
 
 def replay_user(history, last, since_ts, model, scaler):
@@ -156,8 +180,9 @@ def parse_args():
     parser.add_argument(
         "--histories",
         help=(
-            "JSON cache of fetched histories: read if it exists, written after "
-            "the run, so two models can be compared on identical data"
+            "JSON cache of fetched histories (for example .cache/histories.json): "
+            "read if it exists, written after the run, so two models can be "
+            "compared on identical data"
         ),
     )
     return parser.parse_args()
@@ -200,22 +225,22 @@ def score_pool(pool, args, model, scaler, since_ts, cached):
 
 def main() -> int:
     args = parse_args()
-    model = load_model(REPO_ROOT / args.weights)
-    scaler = load_scaler(REPO_ROOT / args.scaler)
+    model = load_model(repo_file(args.weights))
+    scaler = load_scaler(repo_file(args.scaler))
 
     usernames = json.loads((REPO_ROOT / "data" / "usernames.json").read_text())
-    pool = usernames[args.pool_start :]
-    random.Random(args.seed).shuffle(pool)  # noqa: S311 - sampling, not crypto
+    pool = sample_order(usernames[args.pool_start :], args.seed)
 
     now = datetime.now(UTC)
     since_ts = int((now - timedelta(days=args.since_days)).timestamp())
-    cache_path = Path(args.histories) if args.histories else None
+    cache_path = repo_file(args.histories) if args.histories else None
     cached = load_histories(cache_path)
 
     errors, actuals, predictions, tally = score_pool(
         pool, args, model, scaler, since_ts, cached
     )
-    if cache_path:
+    if cache_path is not None:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(cached), encoding="utf-8")
 
     if not errors:
@@ -239,9 +264,9 @@ def main() -> int:
     }
     print(json.dumps(report, indent=2))
     if args.output:
-        Path(args.output).write_text(render_markdown(report), encoding="utf-8")
+        repo_file(args.output).write_text(render_markdown(report), encoding="utf-8")
     if args.json:
-        Path(args.json).write_text(json.dumps(report, indent=2) + "\n", "utf-8")
+        repo_file(args.json).write_text(json.dumps(report, indent=2) + "\n", "utf-8")
     return 0
 
 

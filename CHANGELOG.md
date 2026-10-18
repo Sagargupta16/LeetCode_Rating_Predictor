@@ -16,7 +16,9 @@
 - **`scripts/backtest.py`.** Replays the last 5 rated contests (past year) of
   users outside the training slice, through the same feature code the API
   serves. The weekly data refresh now runs it and commits
-  [docs/backtest.md](docs/backtest.md) in the same PR.
+  [docs/backtest.md](docs/backtest.md) in the same PR. Users are ordered by a
+  hash of the seed and the username, and every path argument must stay inside
+  the repository (`.cache/` is gitignored for the histories cache).
 - **`scripts/train.py`.** Retrains with a train/validation/test split by user
   (user boundaries recovered from the rating chain in `data/data.json`) and the
   scaler fit on training users only, and writes `models/metrics.json`.
@@ -31,9 +33,9 @@
 ### Changed
 
 - **Retrained model (Huber loss, split by user, 242,108 training records).**
-  On two backtest samples of 50 unseen users, MAE went from 7.85 to 7.38 (172
-  contests) and from 8.89 to 8.71 (171 contests); RMSE from 9.87 to 9.44 and
-  from 13.93 to 13.18. Held-out users: MAE 14.14 (the previous model scores
+  On two backtest samples of 50 unseen users, drawn after the model was
+  picked, MAE stayed at 9.11 (173 contests) and went from 7.78 to 7.58 (139
+  contests); RMSE from 20.08 to 19.85 and from 11.54 to 11.42. Held-out users: MAE 14.14 (the previous model scores
   14.22 on the same users). `GOLDEN_PREDICTION` is now 55.0113.
 - **One feature module for the API and the backtest**
   (`app/services/features.py`). The served history summary now matches

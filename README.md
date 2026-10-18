@@ -18,7 +18,7 @@
 
 Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page.
 
-On recent contests of users the model never trained on, it is off by **7.38 and 8.71 rating points** on average in two independent samples of 50 users, and gets the direction of the change right 89.5% and 86.5% of the time. See [Performance](#performance).
+On recent contests of users the model never trained on, it is off by **9.11 and 7.58 rating points** on average in two samples of 50 users, and gets the direction of the change right 90.8% and 90.6% of the time. See [Performance](#performance).
 
 | Web app (desktop) | Web app (phone) |
 |---|---|
@@ -303,16 +303,19 @@ Users are sampled from the part of `data/usernames.json` that the data refresh
 never fetches, so none of their contests is in the training data. Each user's
 last 5 rated contests from the past year are replayed with the history they had
 before each contest, through the same feature code the API serves. Two
-independent samples of 50 users, old and new model on identical contests:
+samples of 50 users, drawn after the model was picked, old and new model on
+identical contests:
 
 | Sample | Contests | Model | MAE | RMSE | Median abs. error | Direction right |
 |---|---|---|---|---|---|---|
-| seed 7 | 172 | 2.3.5 (MSE, random split) | 7.85 | 9.87 | 6.81 | 89.5% |
-| seed 7 | 172 | **2.4.0 (Huber, split by user)** | **7.38** | **9.44** | **5.69** | 89.5% |
-| seed 11 | 171 | 2.3.5 | 8.89 | 13.93 | 6.68 | 87.7% |
-| seed 11 | 171 | **2.4.0** | **8.71** | **13.18** | 6.93 | 86.5% |
+| seed 7 | 173 | 2.3.5 (MSE, random split) | 9.11 | 20.08 | 5.28 | 91.9% |
+| seed 7 | 173 | **2.4.0 (Huber, split by user)** | **9.11** | **19.85** | 5.59 | 90.8% |
+| seed 11 | 139 | 2.3.5 | 7.78 | 11.54 | 6.54 | 89.9% |
+| seed 11 | 139 | **2.4.0** | **7.58** | **11.42** | **4.94** | **90.6%** |
 
-Always predicting 0 scores an MAE of 24.69 and 25.61 on the same two samples.
+On recent contests the two models are close: a tie on one sample and 0.2
+points better on the other. Always predicting 0 scores an MAE of 29.34 and
+26.01 on the same two samples.
 [docs/backtest.md](docs/backtest.md) holds the latest run; the weekly data
 refresh regenerates it.
 
@@ -422,7 +425,7 @@ python main.py
 ### Retraining Checklist
 
 - [ ] Run `python scripts/update_data.py` for fresh data
-- [ ] Copy `models/weights.npz` and `models/scaler.json` aside (the current model)
+- [ ] Copy `models/weights.npz` and `models/scaler.json` to `.cache/old/` (the current model)
 - [ ] Run `python scripts/train.py --loss huber` and `python scripts/export_model.py`
 - [ ] Backtest both models on the same users (`--histories` cache, see
       CONTRIBUTING.md) and keep the new one only if it wins
@@ -481,11 +484,13 @@ node --test extension/core.test.js
 ```bash
 python scripts/backtest.py                          # 50 users, last 5 contests each
 python scripts/backtest.py --seed 11 --users 100
-python scripts/backtest.py --output docs/backtest.md --histories /tmp/h.json
+python scripts/backtest.py --output docs/backtest.md --histories .cache/h.json
 ```
 
-It hits live LeetCode GraphQL (one request per sampled user, about 7 minutes
-for 50 scored users, since most sampled accounts have no recent contest).
+It hits live LeetCode GraphQL (one request per sampled user). 50 scored users
+took 7.5 and 11 minutes on 2026-10-18 (629 and 919 accounts fetched), since
+most sampled accounts have no recent contest. The sample order is a hash of
+the seed and each username, so a seed always picks the same users.
 
 ### Linting
 

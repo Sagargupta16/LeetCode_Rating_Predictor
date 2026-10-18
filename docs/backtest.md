@@ -6,18 +6,18 @@ code the API serves, and is compared with the rating change LeetCode applied.
 
 | Metric | Value |
 |---|---|
-| Contests scored | 172 |
+| Contests scored | 173 |
 | Users | 50 |
-| MAE | **7.38** |
-| RMSE | 9.44 |
-| Median absolute error | 5.69 |
-| Predictions within 10 points | 76.7% |
-| Direction right (gain vs loss) | 89.5% |
-| MAE of always predicting 0 | 24.69 |
+| MAE | **9.11** |
+| RMSE | 19.85 |
+| Median absolute error | 5.59 |
+| Predictions within 10 points | 73.4% |
+| Direction right (gain vs loss) | 90.8% |
+| MAE of always predicting 0 | 29.34 |
 
 Users were sampled with seed 7 from `data/usernames.json` past index
 12000, the slice `scripts/update_data.py` never fetches, so none of
 these contests is in the training data. Up to the last 5 rated contests
 per user count, if they started within 365 days of the run.
-614 sampled accounts had no contest in that window.
+869 sampled accounts had no contest in that window.
 Model: `models/weights.npz`.
