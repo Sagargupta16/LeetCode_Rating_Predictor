@@ -1,0 +1,102 @@
+.lrp-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease,
+    transform 200ms ease;
+}
+
+.lrp-badge--pending {
+  color: #8a8a8a;
+  border-color: rgba(138, 138, 138, 0.4);
+  animation: lrp-pulse 1.2s ease-in-out infinite;
+}
+
+/* Opaque backgrounds so the text contrast (4.5:1 or more) does not depend on
+   the row behind the badge. */
+.lrp-badge--up {
+  color: #116329;
+  background: #e5f6eb;
+  border-color: rgba(44, 187, 93, 0.45);
+  animation: lrp-pop 260ms ease-out;
+}
+
+.lrp-badge--down {
+  color: #a40e26;
+  background: #fde8e8;
+  border-color: rgba(239, 71, 67, 0.45);
+  animation: lrp-pop 260ms ease-out;
+}
+
+.lrp-badge--na {
+  color: #8a8a8a;
+  border-color: rgba(138, 138, 138, 0.35);
+}
+
+.dark .lrp-badge--up {
+  color: #4ade80;
+  background: #1d3123;
+}
+
+.dark .lrp-badge--down {
+  color: #ff7b72;
+  background: #341f1f;
+}
+
+.lrp-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font: 600 13px/1.3 system-ui, sans-serif;
+  color: #f5f5f5;
+  background: #1f2937;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: opacity 400ms ease, transform 400ms ease;
+}
+
+.lrp-pill--done {
+  border-color: #2cbb5d;
+}
+
+@keyframes lrp-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes lrp-pop {
+  from {
+    transform: scale(0.8);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.lrp-cell {
+  display: flex;
+  flex: none;
+  align-items: center;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 104px;
+  height: 50px;
+  padding: 0 12px;
+}
+
+.lrp-head {
+  white-space: nowrap;
+}

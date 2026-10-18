@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from typing import List
 
 import httpx
-import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +23,7 @@ from app.config import (
 )
 from app.model_loader import load_model, load_scaler
 from app.schemas import AttendedContest, PredictionInput, PredictionOutput
+from app.services.features import build_features
 from app.services.leetcode import (
     fetch_attended_contests,
     fetch_contest_data,
@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="2.3.5",
+    version="2.4.0",
     lifespan=lifespan,
 )
 
@@ -185,12 +185,7 @@ async def predict(input_data: PredictionInput, request: Request):
 
         current_rating = user_data.get("rating")
         attended_contests = user_data.get("attendedContestsCount")
-        avg_solve_rate = user_data.get("avgSolveRate", 0.5)
-        avg_finish_time = user_data.get("avgFinishTime", 3000)
-        recent_solve_rate = user_data.get("recentSolveRate", 0.5)
-        recent_finish_time = user_data.get("recentFinishTime", 3000)
-        rating_trend = user_data.get("ratingTrend", 0)
-        max_rating = user_data.get("maxRating", current_rating or 1500)
+        contest_index = user_data.get("contestIndex", attended_contests)
 
         if current_rating is None or attended_contests is None:
             raise HTTPException(
@@ -214,35 +209,11 @@ async def predict(input_data: PredictionInput, request: Request):
             if contest.rank > total_participants:
                 total_participants = int(contest.rank * 1.5)
 
-            # The model was trained on the synthetic participant count built by
-            # scripts/update_data.py, never on registerUserNum, so the features
-            # must use the same formula. Feeding the real count (30k-50k) puts
-            # f3, f4 and f13 outside the training distribution and inflated the
-            # error on a backtest of recent contests.
-            model_participants = max(int(contest.rank * 1.5), 10000)
-            rank_percentage = (contest.rank * 100) / model_participants
-            log_rank = float(np.log1p(contest.rank))
-            rating_x_pct = current_rating * (contest.rank / model_participants)
-            features = np.array(
-                [
-                    [
-                        current_rating,
-                        contest.rank,
-                        model_participants,  # f1-f3
-                        rank_percentage,
-                        attended_contests,  # f4-f5
-                        avg_solve_rate,
-                        avg_finish_time,  # f6-f7
-                        recent_solve_rate,
-                        recent_finish_time,  # f8-f9
-                        rating_trend,
-                        max_rating,  # f10-f11
-                        log_rank,
-                        rating_x_pct,  # f12-f13
-                        avg_solve_rate * current_rating,  # f14
-                        avg_finish_time / 5400,  # f15
-                    ]
-                ]
+            # The model's participant features use the training formula
+            # (see model_participants); the registered count above is display
+            # only.
+            features = build_features(
+                user_data, current_rating, contest.rank, contest_index
             )
 
             rating_change = make_prediction(model, scaler, features)
@@ -262,6 +233,7 @@ async def predict(input_data: PredictionInput, request: Request):
 
             current_rating = new_rating
             attended_contests += 1
+            contest_index += 1
 
         return results
 
