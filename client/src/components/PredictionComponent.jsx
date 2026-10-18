@@ -5,10 +5,15 @@ function getApiBaseUrl() {
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
-  if (globalThis.location?.href?.includes("localhost")) {
-    return "http://localhost:8000";
+  // The Vite dev server (port 3000) has no proxy, so point it at the local API.
+  const { hostname, port } = globalThis.location ?? {};
+  if (port === "3000") {
+    return `http://${hostname}:8000`;
   }
-  return "https://leetcode-rating-predictor.onrender.com";
+  // Everywhere else FastAPI serves the built client itself, so stay on the
+  // same origin. Hard-coding the Render URL sent self-hosted and Docker
+  // instances to the public demo instead of their own backend.
+  return "";
 }
 
 const MAX_DELTA_FOR_BAR = 60;
