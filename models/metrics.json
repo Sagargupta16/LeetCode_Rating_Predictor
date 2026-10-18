@@ -1,0 +1,19 @@
+{
+  "trained": "2026-10-18",
+  "split": "by user",
+  "loss": "huber",
+  "seed": 42,
+  "records": 295899,
+  "users": 8182,
+  "train_records": 242108,
+  "val_records": 26093,
+  "test_records": 27698,
+  "test_users": 818,
+  "epochs_run": 62,
+  "params": 12417,
+  "test": {
+    "mae": 14.14,
+    "rmse": 22.01,
+    "zero_baseline_mae": 27.79
+  }
+}

@@ -49,10 +49,10 @@ GOLDEN_FEATURES = np.array(
     ]
 )
 
-# Produced by the numpy inference path. The TensorFlow path returns
-# 57.28030014038086; the two agree to ~2.3e-05, which is far below the two
-# decimal places the UI renders.
-GOLDEN_PREDICTION = 57.2802848815918
+# Produced by the numpy inference path for the 2.4.0 model (scripts/train.py
+# --loss huber). The TensorFlow path returns 55.0113410949707; the two agree to
+# ~7.6e-06, which is far below the two decimal places the UI renders.
+GOLDEN_PREDICTION = 55.01133346557617
 TOLERANCE = 1e-4
 
 
