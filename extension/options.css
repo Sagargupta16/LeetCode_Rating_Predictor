@@ -65,12 +65,13 @@ button:hover {
 }
 
 button[type="submit"] {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: #2563eb;
+  border-color: #2563eb;
   color: #fff;
 }
 
 #status {
+  display: block;
   min-height: 1.5em;
   margin-top: 12px;
 }

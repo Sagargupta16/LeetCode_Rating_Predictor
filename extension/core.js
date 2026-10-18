@@ -30,7 +30,7 @@
    */
   function ranksFromRanking(payload) {
     const ranks = new Map();
-    for (const row of (payload && payload.total_rank) || []) {
+    for (const row of payload?.total_rank || []) {
       if (row.data_region && row.data_region !== "US") continue;
       const slug = row.user_slug || row.username;
       if (!USERNAME_RE.test(slug || "") || !Number.isInteger(row.rank)) continue;
@@ -64,7 +64,9 @@
       return null;
     }
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    return `${url.origin}${url.pathname}`.replace(/\/+$/, "");
+    let base = `${url.origin}${url.pathname}`;
+    while (base.endsWith("/")) base = base.slice(0, -1);
+    return base;
   }
 
   /** Cache key for one prediction. */

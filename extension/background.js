@@ -27,38 +27,49 @@ async function apiBase() {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// One POST to the API; null when the network itself failed.
+async function postPredict(base, body) {
+  try {
+    return await fetch(`${base}/api/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  } catch {
+    return null;
+  }
+}
+
+// What a final (non-429) response means for the badge.
+async function readAnswer(response) {
+  if (response.status === 400 || response.status === 422) return { error: "no-history" };
+  if (!response.ok) return { error: "unavailable" };
+  const summary = summarizePrediction(await response.json());
+  return summary || { error: "unavailable" };
+}
+
 async function requestPrediction({ contest, username, rank }) {
   const base = await apiBase();
+  const body = JSON.stringify({ username, contests: [{ name: contest, rank }] });
   let networkErrors = 0;
   let throttled = 0;
   for (;;) {
     const wait = pausedUntil - Date.now();
     if (wait > 0) await sleep(wait);
 
-    let response;
-    try {
-      response = await fetch(`${base}/api/predict`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, contests: [{ name: contest, rank }] }),
-      });
-    } catch {
+    const response = await postPredict(base, body);
+    if (!response) {
       networkErrors += 1;
       if (networkErrors >= MAX_NETWORK_ATTEMPTS) return { error: "unreachable" };
       await sleep(3000 * networkErrors);
-      continue;
-    }
-    if (response.status === 429) {
+    } else if (response.status === 429) {
       throttled += 1;
       if (throttled > MAX_THROTTLED_WAITS) return { error: "rate-limited" };
       const seconds = retryAfterSeconds(response.headers.get("Retry-After"));
       pausedUntil = Math.max(pausedUntil, Date.now() + seconds * 1000);
-      continue;
+    } else {
+      return readAnswer(response);
     }
-    if (response.status === 400 || response.status === 422) return { error: "no-history" };
-    if (!response.ok) return { error: "unavailable" };
-    const summary = summarizePrediction(await response.json());
-    return summary || { error: "unavailable" };
   }
 }
 
@@ -94,7 +105,7 @@ function pump() {
   while (active < MAX_CONCURRENT && queue.length) {
     const { job, resolve } = queue.shift();
     active += 1;
-    predict(job)
+    void predict(job)
       .catch(() => ({ error: "unavailable" }))
       .then(resolve)
       .finally(() => {

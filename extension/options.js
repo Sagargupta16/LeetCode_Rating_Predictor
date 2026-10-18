@@ -3,11 +3,11 @@ const { DEFAULT_API_BASE, normalizeApiBase } = self.LRP;
 
 const form = document.getElementById("settings");
 const input = document.getElementById("apiBase");
-const status = document.getElementById("status");
+const statusLine = document.getElementById("status");
 
 function say(text, ok) {
-  status.textContent = text;
-  status.className = ok ? "ok" : "err";
+  statusLine.textContent = text;
+  statusLine.className = ok ? "ok" : "err";
 }
 
 async function grant(base) {
@@ -51,7 +51,7 @@ form.addEventListener("submit", async (event) => {
 
 document.getElementById("check").addEventListener("click", () => {
   const base = normalizeApiBase(input.value);
-  if (base) check(base);
+  if (base) void check(base);
   else say("Enter an http(s) URL", false);
 });
 
@@ -61,6 +61,5 @@ document.getElementById("reset").addEventListener("click", async () => {
   say("Using the public demo", true);
 });
 
-chrome.storage.sync.get("apiBase").then(({ apiBase }) => {
-  input.value = apiBase || DEFAULT_API_BASE;
-});
+const { apiBase } = await chrome.storage.sync.get("apiBase");
+input.value = apiBase || DEFAULT_API_BASE;

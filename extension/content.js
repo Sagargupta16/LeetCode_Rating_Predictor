@@ -30,7 +30,7 @@
   }
 
   function ensurePill() {
-    if (pill && pill.isConnected) return pill;
+    if (pill?.isConnected) return pill;
     pill = document.createElement("div");
     pill.className = "lrp-pill";
     pill.setAttribute("role", "status");
@@ -99,8 +99,8 @@
   // after it stay aligned. If the layout ever changes (no "Score" header or a
   // non-numeric score), no column is added and the badge sits next to the name.
   function columnSlot(link) {
-    const nameCell = link.parentElement && link.parentElement.parentElement;
-    const scoreCell = nameCell && nameCell.nextElementSibling;
+    const nameCell = link.parentElement?.parentElement;
+    const scoreCell = nameCell?.nextElementSibling;
     if (!scoreCell || !/^\d+(\.\d+)?$/.test(scoreCell.textContent.trim())) return null;
 
     const table = nameCell.parentElement?.parentElement?.parentElement;
@@ -112,14 +112,14 @@
       head.className = "lrp-cell lrp-head";
       head.textContent = "Predicted";
       head.title = "Predicted rating change (LeetCode Rating Predictor extension)";
-      headScore.insertAdjacentElement("afterend", head);
+      headScore.after(head);
     }
 
     let cell = scoreCell.nextElementSibling;
-    if (!cell || !cell.classList.contains("lrp-cell")) {
+    if (!cell?.classList.contains("lrp-cell")) {
       cell = document.createElement("div");
       cell.className = "lrp-cell";
-      scoreCell.insertAdjacentElement("afterend", cell);
+      scoreCell.after(cell);
     }
     return cell;
   }
@@ -129,7 +129,7 @@
     if (cell) {
       cell.replaceChildren(badge);
     } else {
-      link.insertAdjacentElement("afterend", badge);
+      link.after(badge);
     }
   }
 
@@ -163,7 +163,7 @@
       }
       const key = `${route.contest}:${slug}:${rank}`;
       const existing = existingBadge(link);
-      if (existing && existing.getAttribute(BADGE_ATTR) === key) continue;
+      if (existing?.getAttribute(BADGE_ATTR) === key) continue;
       if (existing) existing.remove();
 
       const badge = document.createElement("span");
@@ -179,7 +179,7 @@
         renderPill();
       }, 5000);
       renderPill();
-      sendPredict({ contest: route.contest, username: slug, rank }).then((result) => {
+      void sendPredict({ contest: route.contest, username: slug, rank }).then((result) => {
         clearTimeout(waking);
         if (!badge.isConnected) return;
         showResult(badge, result, rank);
