@@ -99,7 +99,9 @@ def _retry_delay(attempt: int, retry_after: str | None) -> float:
     return BACKOFF_SECONDS * (2**attempt)
 
 
-def fetch_user_contest_history(session, username: str) -> list | None:
+def fetch_user_contest_history(
+    session, username: str, query: str = GRAPHQL_QUERY
+) -> list | None:
     """Fetch contest history for a user, retrying throttled and 5xx responses.
 
     Returns the history list, or ``None`` when the fetch itself failed. An empty
@@ -112,7 +114,7 @@ def fetch_user_contest_history(session, username: str) -> list | None:
         try:
             response = session.post(
                 LEETCODE_GRAPHQL_URL,
-                json={"query": GRAPHQL_QUERY, "variables": {"username": username}},
+                json={"query": query, "variables": {"username": username}},
                 timeout=10,
             )
         except requests.exceptions.RequestException as e:
