@@ -1,6 +1,7 @@
 # Runtime needs no ML framework, so the base image only has to carry numpy and
-# the web stack. Kept at 3.12 to match render.yaml / runtime.txt.
-FROM python:3.14-slim
+# the web stack. Kept at 3.12 to match render.yaml / runtime.txt (renovate.json
+# caps Python below 3.13 so the monthly update cannot drift it again).
+FROM python:3.12-slim
 WORKDIR /app
 
 # Install system deps. No compiler is needed: the pip install below is
