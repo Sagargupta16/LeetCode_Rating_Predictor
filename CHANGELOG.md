@@ -17,8 +17,10 @@
   users outside the training slice, through the same feature code the API
   serves. The weekly data refresh now runs it and commits
   [docs/backtest.md](docs/backtest.md) in the same PR. Users are ordered by a
-  hash of the seed and the username, and every path argument must stay inside
-  the repository (`.cache/` is gitignored for the histories cache).
+  hash of the seed and the username. The report goes to stdout (`--markdown`
+  for the docs format), `--cache` reuses `.cache/histories.json` so two models
+  score the same contests, and `--weights` / `--scaler` must stay inside the
+  repository.
 - **`scripts/train.py`.** Retrains with a train/validation/test split by user
   (user boundaries recovered from the rating chain in `data/data.json`) and the
   scaler fit on training users only, and writes `models/metrics.json`.

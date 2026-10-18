@@ -13,9 +13,12 @@ no backtested contest can be in the training data.
 Usage:
     python scripts/backtest.py                       # 50 users, last 5 contests
     python scripts/backtest.py --users 100 --seed 3
-    python scripts/backtest.py --output docs/backtest.md
+    python scripts/backtest.py --markdown > docs/backtest.md
+    python scripts/backtest.py --cache   # reuse .cache/histories.json
 
-Every path argument is relative to the repository root and must stay inside it.
+The report goes to stdout (JSON, or markdown with ``--markdown``) and progress
+goes to stderr. ``--weights`` and ``--scaler`` are relative to the repository
+root and must stay inside it.
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CACHE_PATH = REPO_ROOT / ".cache" / "histories.json"
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.model_loader import load_model, load_scaler  # noqa: E402
@@ -172,26 +176,34 @@ def parse_args():
     )
     parser.add_argument("--weights", default="models/weights.npz")
     parser.add_argument("--scaler", default="models/scaler.json")
-    parser.add_argument("--output", help="write the markdown report here")
-    parser.add_argument("--json", help="write the raw report as JSON here")
+    parser.add_argument(
+        "--markdown",
+        action="store_true",
+        help="print the report as markdown (the docs/backtest.md format), not JSON",
+    )
     parser.add_argument(
         "--delay", type=float, default=0.3, help="seconds between users"
     )
     parser.add_argument(
-        "--histories",
+        "--cache",
+        action="store_true",
         help=(
-            "JSON cache of fetched histories (for example .cache/histories.json): "
-            "read if it exists, written after the run, so two models can be "
-            "compared on identical data"
+            "read fetched histories from .cache/histories.json and write new ones "
+            "back, so two models can be compared on identical data"
         ),
     )
     return parser.parse_args()
 
 
-def load_histories(path):
-    if path and path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+def load_histories():
+    if CACHE_PATH.exists():
+        return json.loads(CACHE_PATH.read_text(encoding="utf-8"))
     return {}
+
+
+def save_histories(histories):
+    CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CACHE_PATH.write_text(json.dumps(histories), encoding="utf-8")
 
 
 def score_pool(pool, args, model, scaler, since_ts, cached):
@@ -219,7 +231,10 @@ def score_pool(pool, args, model, scaler, since_ts, cached):
             errors.append(predicted - actual)
             actuals.append(actual)
             predictions.append(predicted)
-        print(f"[{tally['users']}/{args.users}] {username}: {len(rows)} contests")
+        print(
+            f"[{tally['users']}/{args.users}] {username}: {len(rows)} contests",
+            file=sys.stderr,
+        )
     return errors, actuals, predictions, tally
 
 
@@ -233,15 +248,13 @@ def main() -> int:
 
     now = datetime.now(UTC)
     since_ts = int((now - timedelta(days=args.since_days)).timestamp())
-    cache_path = repo_file(args.histories) if args.histories else None
-    cached = load_histories(cache_path)
+    cached = load_histories() if args.cache else {}
 
     errors, actuals, predictions, tally = score_pool(
         pool, args, model, scaler, since_ts, cached
     )
-    if cache_path is not None:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(cached), encoding="utf-8")
+    if args.cache:
+        save_histories(cached)
 
     if not errors:
         print("No contests scored; LeetCode may be throttling.", file=sys.stderr)
@@ -262,11 +275,10 @@ def main() -> int:
         },
         "metrics": summarize(errors, actuals, predictions),
     }
-    print(json.dumps(report, indent=2))
-    if args.output:
-        repo_file(args.output).write_text(render_markdown(report), encoding="utf-8")
-    if args.json:
-        repo_file(args.json).write_text(json.dumps(report, indent=2) + "\n", "utf-8")
+    if args.markdown:
+        print(render_markdown(report), end="")
+    else:
+        print(json.dumps(report, indent=2))
     return 0
 
 

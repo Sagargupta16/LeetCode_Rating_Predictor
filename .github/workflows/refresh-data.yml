@@ -35,10 +35,13 @@ jobs:
 
       # Re-measure the served model on recent contests of users outside the
       # training slice, so the PR (and docs/backtest.md) carries a current
-      # accuracy number. A throttled backtest must not block the data refresh.
+      # accuracy number. A throttled backtest must not block the data refresh,
+      # and it only replaces docs/backtest.md when it finished.
       - name: Backtest the served model
         continue-on-error: true
-        run: uv run --no-sync --no-build python scripts/backtest.py --output docs/backtest.md
+        run: |
+          uv run --no-sync --no-build python scripts/backtest.py --markdown > "$RUNNER_TEMP/backtest.md"
+          mv "$RUNNER_TEMP/backtest.md" docs/backtest.md
 
       - name: Open a PR if the data changed
         # v7.0.8 ran `git remote prune origin` against checkout@v6's persisted

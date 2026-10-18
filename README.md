@@ -427,7 +427,7 @@ python main.py
 - [ ] Run `python scripts/update_data.py` for fresh data
 - [ ] Copy `models/weights.npz` and `models/scaler.json` to `.cache/old/` (the current model)
 - [ ] Run `python scripts/train.py --loss huber` and `python scripts/export_model.py`
-- [ ] Backtest both models on the same users (`--histories` cache, see
+- [ ] Backtest both models on the same users (`--cache`, see
       CONTRIBUTING.md) and keep the new one only if it wins
 - [ ] Update `GOLDEN_PREDICTION` in `tests/test_model_artifacts.py`
 - [ ] Commit the artifacts with `models/metrics.json`, restart the API
@@ -484,8 +484,11 @@ node --test extension/core.test.js
 ```bash
 python scripts/backtest.py                          # 50 users, last 5 contests each
 python scripts/backtest.py --seed 11 --users 100
-python scripts/backtest.py --output docs/backtest.md --histories .cache/h.json
+python scripts/backtest.py --markdown --cache > docs/backtest.md
 ```
+
+The report goes to stdout (JSON, or markdown with `--markdown`); progress goes
+to stderr.
 
 It hits live LeetCode GraphQL (one request per sampled user). 50 scored users
 took 7.5 and 11 minutes on 2026-10-18 (629 and 919 accounts fetched), since
