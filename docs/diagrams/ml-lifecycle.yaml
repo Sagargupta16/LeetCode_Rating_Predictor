@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Sagargupta16/orrery/main/skills/orrery/references/diagram.schema.json
+# Rendered with orrery (github.com/Sagargupta16/orrery):
+#   orrery render docs/diagrams/ml-lifecycle.yaml -o docs/diagrams/ml-lifecycle -f svg --theme both
+# Reviewed at README width: orrery review docs/diagrams/ml-lifecycle.yaml --width 880
+title: Data and model lifecycle
+subtitle: A weekly job refreshes the data in a PR; retraining is manual and ships only if it wins the backtest
+direction: right
+layout: { spacing: compact }
+legend:
+  dashed: Merged or committed by hand
+
+groups:
+  weekly: { type: box, label: Weekly GitHub Actions job, icon: logos:github-actions, evidence: .github/workflows/refresh-data.yml:8 }
+  manual: { type: dashed, label: Manual retrain, evidence: CONTRIBUTING.md:13 }
+
+nodes:
+  update: { icon: logos:python, label: update_data.py, note: "12,000 users, 95% retention floor", in: weekly, evidence: [scripts/update_data.py:73, scripts/update_data.py:44] }
+  backtest: { icon: tabler:chart-line, label: backtest.py, note: scores models/ on unseen users, in: weekly, evidence: [scripts/backtest.py:177, scripts/backtest.py:241] }
+  pr: { icon: github:git-pull-request, label: Data PR, note: opened for review, in: weekly, evidence: .github/workflows/refresh-data.yml:52 }
+  graphql: { icon: logos:graphql, label: LeetCode GraphQL, note: leetcode.com/graphql, evidence: scripts/update_data.py:30 }
+  train: { icon: logos:tensorflow, label: train.py, note: "Keras, split by user, --loss huber", in: manual, evidence: [scripts/train.py:122, CONTRIBUTING.md:22] }
+  export: { icon: logos:python, label: export_model.py, note: Dense layers to NumPy arrays, in: manual, align: train, evidence: scripts/export_model.py:120 }
+  weights: { icon: tabler:file-database, label: Model artifacts, note: models/weights.npz + scaler.json, evidence: scripts/export_model.py:35 }
+  serve: { icon: logos:fastapi-icon, label: FastAPI on Render, note: loads models/ at startup, align: weights, evidence: main.py:75 }
+
+edges:
+  - weekly -> graphql: { label: contest histories, evidence: [scripts/update_data.py:116, scripts/backtest.py:219] }
+  - update -> pr: { label: data/data.json, evidence: scripts/update_data.py:370 }
+  - backtest -> pr: { label: docs/backtest.md, evidence: .github/workflows/refresh-data.yml:44 }
+  - pr --> train: { label: after merge, evidence: CONTRIBUTING.md:16 }
+  - train -> export: { label: model.keras, evidence: scripts/train.py:167 }
+  - export -> weights: { evidence: scripts/export_model.py:35 }
+  - weights --> serve: { label: committed if it wins, evidence: CONTRIBUTING.md:33 }
