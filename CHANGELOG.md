@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.4.1] - 2026-10-21
+
+### Docs
+
+- README: the Mermaid chart in Architecture is replaced by two figures drawn
+  with [orrery](https://github.com/Sagargupta16/orrery), each in a light and a
+  dark SVG: the serving path (browser, the one Render web service, LeetCode)
+  and the data and model lifecycle (weekly refresh PR, manual retrain and
+  export, backtest gate). Their specs live in `docs/diagrams/`, and every node
+  and edge names the file and line it comes from (`orrery verify` checks
+  them). The serving figure adds two flows the chart left out: the extension
+  reading ranks from the ranking page JSON, and the keep-warm job. The GraphQL
+  bullet under it now says that is the API's path, since the extension reads
+  the ranking JSON in the browser.
+
 ## [2.4.0] - 2026-10-18
 
 ### Added

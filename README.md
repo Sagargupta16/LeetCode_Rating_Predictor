@@ -63,38 +63,25 @@ points off on average.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Browser
-        UI[React 19 + Vite client]
-        EXT["Chrome extension<br/>on leetcode.com ranking pages"]
-    end
-    subgraph Server["FastAPI (uvicorn)"]
-        API["/api/predict<br/>/api/userContests<br/>/api/contestData"]
-        RL[Per-IP rate limiter]
-        C[(TTL cache or Redis)]
-        M["NumPy Dense network<br/>models/weights.npz + scaler.json"]
-    end
-    LC[(LeetCode GraphQL)]
-    UI -->|same origin in prod| API
-    EXT -->|service worker, one request per row| API
-    API --> RL
-    API --> C
-    API -->|user history, contest info| LC
-    API --> M
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/diagrams/architecture-light.svg">
+  <img width="880" src="docs/diagrams/architecture-light.svg" alt="Serving architecture. In your browser, the React web app (served from client/build on the same origin) and the Chrome extension call FastAPI, which runs as one Render web service; the extension also reads ranks from the LeetCode ranking page JSON. FastAPI checks a per-IP rate limiter of 30 requests a minute, reads a TTL cache (in memory, or Redis when REDIS_URL is set), calls LeetCode GraphQL for histories and contests on a cache miss, and runs a NumPy Dense network on 15 features, loaded at startup from models/weights.npz and scaler.json. A GitHub Actions keep-warm job pings /api/health every 10 minutes on contest days.">
+</picture>
 
-    subgraph Training["Offline training (manual)"]
-        U[scripts/update_data.py<br/>weekly GitHub Action] --> D[(data/data.json)]
-        D --> TR[scripts/train.py<br/>split by user] --> K[model.keras + scaler.save]
-        K --> EX[scripts/export_model.py] --> M
-        M --> BT[scripts/backtest.py<br/>weekly, users outside training]
-    end
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/ml-lifecycle-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/diagrams/ml-lifecycle-light.svg">
+  <img width="880" src="docs/diagrams/ml-lifecycle-light.svg" alt="Data and model lifecycle. A weekly GitHub Actions job runs update_data.py (12,000 users, 95% retention floor) and backtest.py (scores the served model on users outside the training data), both against LeetCode GraphQL, and opens a PR with data/data.json and docs/backtest.md for review. After merge, a manual retrain runs train.py (Keras, split by user, --loss huber), which writes model.keras, then export_model.py turns the Dense layers into NumPy arrays in models/weights.npz and scaler.json. Those artifacts are committed only if they win the backtest, and FastAPI on Render loads them at startup.">
+</picture>
+
+The specs behind the pictures are [`docs/diagrams/architecture.yaml`](docs/diagrams/architecture.yaml) and [`docs/diagrams/ml-lifecycle.yaml`](docs/diagrams/ml-lifecycle.yaml), rendered with [orrery](https://github.com/Sagargupta16/orrery).
 
 - FastAPI serves both the API and the built React client, so production is one
   process on one origin. The Vite dev server (port 3000) talks to the API on
   port 8000.
-- All LeetCode data is fetched via **GraphQL** (the REST ranking API is blocked).
+- The API fetches all LeetCode data via **GraphQL** (the REST ranking API is
+  blocked for servers; the extension reads it in the browser).
 - Training and serving are split: TensorFlow is only needed offline, and the
   served model is plain NumPy (see [Serving](#serving)).
 
@@ -139,7 +126,7 @@ notebooks/
   LC_Contest_Rating_Predictor.ipynb  # Original training notebook (random split)
 data/                            # Training data
 models/                          # Exported weights + scaler (served) + metrics.json
-docs/                            # backtest.md (refreshed weekly) + screenshots
+docs/                            # backtest.md (refreshed weekly), screenshots, diagrams/ (orrery specs + SVGs)
 extension/                       # Chrome extension (8 tests, no build step)
 tests/                           # 68 backend tests
 client/                          # React frontend (19 tests)
