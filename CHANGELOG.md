@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.2] - 2026-10-24
+
+### Docs
+
+- Redrew both README diagrams with orrery 0.12.0, which draws icons at 64 px
+  instead of 48. The serving figure now uses `layout.spacing: 0.6` instead of
+  `compact`, so the bigger tiles still fit a 1159 px canvas (was 1222) and
+  read at 880 px; nodes, edges and evidence are unchanged.
+
 ## [2.4.1] - 2026-10-21
 
 ### Docs
