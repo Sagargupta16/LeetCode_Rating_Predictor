@@ -5,7 +5,7 @@
 title: LeetCode Rating Predictor
 subtitle: One uvicorn process on Render serves the React app, the API and the NumPy model
 direction: right
-layout: { spacing: compact }
+layout: { spacing: 0.6 }
 legend:
   dashed: Scheduled, contest days only
 
