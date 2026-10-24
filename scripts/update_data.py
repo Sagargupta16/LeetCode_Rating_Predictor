@@ -14,7 +14,6 @@ import argparse
 import json
 import logging
 import os
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -99,6 +98,37 @@ def _retry_delay(attempt: int, retry_after: str | None) -> float:
     return BACKOFF_SECONDS * (2**attempt)
 
 
+def _post_once(session, username: str, query: str):
+    """One fetch attempt, as ``(done, history, retry_after)``.
+
+    ``done`` means stop retrying: ``history`` is then the result, ``None`` for a
+    response that another attempt will not fix. Otherwise the attempt failed in
+    a retryable way and ``retry_after`` carries the server's hint, if any.
+    """
+    try:
+        response = session.post(
+            LEETCODE_GRAPHQL_URL,
+            json={"query": query, "variables": {"username": username}},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as e:
+        logger.debug(f"Network error fetching {username}: {e}")
+        return False, None, None
+
+    if response.status_code == 200:
+        try:
+            payload = response.json()
+        except ValueError as e:
+            logger.debug(f"Parse error fetching {username}: {e}")
+            return True, None, None
+        data = payload.get("data") or {}
+        return True, data.get("userContestRankingHistory") or [], None
+    if response.status_code not in RETRYABLE_STATUS:
+        logger.debug(f"HTTP {response.status_code} fetching {username}")
+        return True, None, None
+    return False, None, response.headers.get("Retry-After")
+
+
 def fetch_user_contest_history(
     session, username: str, query: str = GRAPHQL_QUERY
 ) -> list | None:
@@ -110,28 +140,9 @@ def fetch_user_contest_history(
     run from a user with nothing to report.
     """
     for attempt in range(MAX_ATTEMPTS):
-        retry_after = None
-        try:
-            response = session.post(
-                LEETCODE_GRAPHQL_URL,
-                json={"query": query, "variables": {"username": username}},
-                timeout=10,
-            )
-        except requests.exceptions.RequestException as e:
-            logger.debug(f"Network error fetching {username}: {e}")
-        else:
-            if response.status_code == 200:
-                try:
-                    payload = response.json()
-                except ValueError as e:
-                    logger.debug(f"Parse error fetching {username}: {e}")
-                    return None
-                data = payload.get("data") or {}
-                return data.get("userContestRankingHistory") or []
-            if response.status_code not in RETRYABLE_STATUS:
-                logger.debug(f"HTTP {response.status_code} fetching {username}")
-                return None
-            retry_after = response.headers.get("Retry-After")
+        done, history, retry_after = _post_once(session, username, query)
+        if done:
+            return history
 
         if attempt + 1 < MAX_ATTEMPTS:
             time.sleep(_retry_delay(attempt, retry_after))
@@ -275,9 +286,11 @@ def collect_records(
 
     The tally separates `failed` from `empty` so a throttled run is visible in
     the output instead of looking like a set of users with no contests.
+
+    Records come back in ``usernames`` order, not in the order fetches finish,
+    so a weekly refresh only rewrites the lines whose data changed.
     """
-    all_data: list[dict] = []
-    data_lock = threading.Lock()
+    by_user: dict[str, list[dict]] = {}
     tally = {"successful": 0, "empty": 0, "failed": 0}
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -297,14 +310,14 @@ def collect_records(
                     if user_data is None:
                         tally["failed"] += 1
                     elif user_data:
-                        with data_lock:
-                            all_data.extend(user_data)
+                        by_user[future_to_user[future]] = user_data
                         tally["successful"] += 1
                     else:
                         tally["empty"] += 1
                 finally:
                     pbar.update(1)
 
+    all_data = [record for name in usernames for record in by_user.get(name, [])]
     return all_data, tally
 
 

@@ -35,6 +35,9 @@ query userContestRankingInfo($username: String!) {
         problemsSolved
         totalProblems
         finishTimeInSeconds
+        contest {
+            titleSlug
+        }
     }
 }
 """
@@ -63,22 +66,20 @@ query contestDetailPage($contestSlug: String!) {
 }
 """
 
-TOP_CONTESTS_QUERY = """
+# topTwoContests is the next two contests, which have not happened yet, so on
+# its own it never offers the contest people just finished and want predicted.
+# pastContests supplies the most recent finished ones.
+LATEST_CONTESTS_QUERY = """
 query {
-    topTwoContests {
-        title
-        titleSlug
-    }
-}
-"""
-
-PAST_CONTESTS_QUERY = """
-query {
-    pastContests(pageNo: 1, numPerPage: 5) {
+    pastContests(pageNo: 1, numPerPage: 2) {
         data {
-            title
             titleSlug
+            startTime
         }
+    }
+    topTwoContests {
+        titleSlug
+        startTime
     }
 }
 """
@@ -126,9 +127,12 @@ async def fetch_user_data(
                 # has seen exactly this case.
                 user_data = {"rating": DEFAULT_RATING, "attendedContestsCount": 0}
 
-            # Per-user model inputs, see app/services/features.py
+            # Per-user model inputs, see app/services/features.py. The raw
+            # history stays too, so contests LeetCode already rated can be
+            # scored from the state before them.
             history = payload.get("userContestRankingHistory") or []
             user_data.update(summarize_history(history))
+            user_data["history"] = history
 
             cache.set(f"user:{username}", user_data)
             return user_data
@@ -278,35 +282,36 @@ async def find_latest_contests(
     client: httpx.AsyncClient,
     cache,
 ) -> List[str]:
-    """Find the latest contest slugs via LeetCode GraphQL API."""
+    """The two most recent finished contests and the next two, oldest first.
+
+    Oldest first because ``/api/predict`` carries the rating forward through
+    the list in order.
+    """
     cached = cache.get("latest_contests")
-    if cached:
+    if cached is not None:
         return cached
 
     try:
         response = await client.post(
             LEETCODE_GRAPHQL_URL,
             headers=GRAPHQL_HEADERS,
-            json={"query": TOP_CONTESTS_QUERY},
+            json={"query": LATEST_CONTESTS_QUERY},
         )
         response.raise_for_status()
-        data = response.json()
-        top = data.get("data", {}).get("topTwoContests") or []
-        slugs = [c["titleSlug"] for c in top if c.get("titleSlug")]
+        payload = response.json().get("data") or {}
+        past = (payload.get("pastContests") or {}).get("data") or []
+        upcoming = payload.get("topTwoContests") or []
 
-        if not slugs:
-            response = await client.post(
-                LEETCODE_GRAPHQL_URL,
-                headers=GRAPHQL_HEADERS,
-                json={"query": PAST_CONTESTS_QUERY},
-            )
-            response.raise_for_status()
-            data = response.json()
-            past = data.get("data", {}).get("pastContests", {}).get("data") or []
-            slugs = [c["titleSlug"] for c in past[:2] if c.get("titleSlug")]
+        start_times = {}
+        for contest in past + upcoming:
+            slug = contest.get("titleSlug")
+            if slug and CONTEST_NAME_RE.match(slug):
+                start_times[slug] = contest.get("startTime") or 0
+        slugs = sorted(start_times, key=start_times.get)
 
-        if slugs:
-            cache.set("latest_contests", slugs)
+        # Cached even when empty, so a bad answer costs one upstream call per
+        # TTL instead of one per page load.
+        cache.set("latest_contests", slugs)
         return slugs
     except Exception as e:
         logger.exception("Error finding latest contests")

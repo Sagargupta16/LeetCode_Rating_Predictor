@@ -29,7 +29,8 @@ python scripts/backtest.py --cache \
 `--cache` keeps the fetched contest histories in `.cache/histories.json`
 (gitignored), so both runs score the same contests. Copy the current
 `models/weights.npz` and `models/scaler.json` to `.cache/old/` before exporting
-the new model; `--weights` and `--scaler` must point inside the repository.
+the new model; `--weights` and `--scaler` must name a file under `models/` or
+`.cache/`.
 Only ship a model that wins on the backtest, and commit the regenerated
 artifacts and `models/metrics.json` together.
 

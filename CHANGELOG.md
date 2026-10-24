@@ -1,5 +1,72 @@
 # Changelog
 
+## [2.5.0] - 2026-10-24
+
+### Fixed
+
+- **Auto-filled contests were counted twice.** Auto-fill fills contests
+  LeetCode has already rated, and `/api/predict` scored them from the current
+  rating, which already includes them. A rated contest is now scored from the
+  history as it stood before it (`replay_features`, the replay
+  `scripts/backtest.py` uses), no longer moves the rating chain, and comes back
+  with `actual_change`. Checked live on `weekly-contest-519` (rank 269): it was
+  predicted from 2165.70 to 2209.32, and is now predicted from 2119.78 to
+  2167.19 against the 2165.70 LeetCode gave. The UI shows the actual change and
+  leaves rated contests out of the net change.
+- **The form never offered the contest that just ended.** `/api/contestData`
+  read only `topTwoContests`, which lists upcoming contests: on 2026-10-24 it
+  returned weekly 525 and biweekly 194, so the finished weekly 524 could not be
+  predicted from the web app. It now returns the two latest finished contests
+  (`pastContests`) and the next two, oldest first.
+- **The Docker image could not install its dependencies.** The 2.4.x
+  `requirements.lock.txt` was not generated from `uv.lock`: its
+  `pydantic-core 2.49.0` hashes fail `pip install --require-hashes` for Linux
+  cp312, and it lacked `opentelemetry-api`, which fastapi 0.142 needs. Both
+  lock files are regenerated from `uv.lock` with the CONTRIBUTING commands.
+- Inputs were 15.2 px, so iOS Safari zoomed into the form on focus; they are
+  16 px. Page height uses `100dvh`.
+- `docker-compose.yml` mounted the whole repo over `/app`, hiding the
+  `client/build` the image compiled. It now mounts `main.py`, `app/` and
+  `models/` only.
+
+### Security
+
+- The rate limiter keyed on the first `X-Forwarded-For` entry, which the
+  caller controls, so sending a new value per request skipped the limit (60 of
+  60 passed locally). It now keys on `CLIENT_IP_HEADER`, default
+  `cf-connecting-ip` (Cloudflare sets it in front of Render), or the socket
+  peer.
+- `/api/predict` accepted any number of contests, each a LeetCode call for one
+  rate-limit hit (500 contests made 500 upstream calls). It takes at most 20,
+  and `/api/contestData` is rate limited too.
+- Dependency alerts: certifi 2026.10.23 in all three lock files (renovate #180
+  had bumped one), black 26.10.1, virtualenv 21.14.13, filelock 4.2.4,
+  setuptools 84.2.1, opentelemetry-api 1.45.1, and `npm audit fix` in the
+  client (undici 8.12.3, vitest 4.1.12).
+- `scripts/backtest.py` reads `--weights` and `--scaler` only from files that
+  exist under `models/` or `.cache/`.
+
+### Changed
+
+- `requests` and `tqdm` leave the runtime dependencies: only `scripts/`
+  imports them, so they move to the dev group and `requirements-dev.txt`. The
+  runtime lock also moves to current starlette 1.9.0, anyio 4.15.1 and
+  websockets 17.3.
+- `render.yaml` installs the hash-pinned `requirements.lock.txt`. The live
+  Render service is not Blueprint-managed, so its dashboard build command still
+  decides what production installs.
+- `scripts/update_data.py` writes records in `usernames.json` order rather
+  than in the order fetches finish, so a weekly refresh rewrites only the lines
+  that changed (#175). The next refresh reorders the file once.
+- The in-memory cache and the rate limiter drop expired entries once per TTL
+  or window, instead of keeping one per username and client forever.
+- `/api/predict` fetches contest details concurrently.
+- Removed `scripts/download_model.py` and `models/manifest.json`: the manifest
+  pointed at `example.com` placeholders, and the files it fetched are not the
+  ones the API serves.
+- Removed the `prefers-reduced-motion` override from the web app's CSS.
+- API, client and extension report 2.5.0 (they still said 2.4.0).
+
 ## [2.4.2] - 2026-10-24
 
 ### Docs

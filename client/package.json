@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "dependencies": {
@@ -25,6 +25,6 @@
     "msw": "^2.15.0",
     "prettier": "^3.9.6",
     "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

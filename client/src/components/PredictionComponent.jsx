@@ -50,7 +50,7 @@ const PredictionComponent = () => {
         if (!cancelled) setIsLoadingContests(false);
       }
     };
-    fetchContests();
+    void fetchContests();
     return () => {
       cancelled = true;
     };
@@ -163,7 +163,11 @@ const PredictionComponent = () => {
     }
   };
 
-  const netChange = predictionResults.reduce((sum, r) => sum + r.prediction, 0);
+  // A contest LeetCode already rated comes back with actual_change and is
+  // already part of the current rating, so only the ones still to be rated
+  // add up to a net change.
+  const pending = predictionResults.filter((r) => r.actual_change == null);
+  const netChange = pending.reduce((sum, r) => sum + r.prediction, 0);
 
   return (
     <div className="glass-card">
@@ -280,7 +284,7 @@ const PredictionComponent = () => {
           </output>
         )}
 
-        {predictionResults.length > 1 && !isLoading && (
+        {pending.length > 1 && !isLoading && (
           <div className="summary">
             <span className="summary-label">Net change</span>
             <span
@@ -309,6 +313,14 @@ const PredictionComponent = () => {
                 }}
               />
             </div>
+
+            {r.actual_change != null && (
+              <p className="hint">
+                Already rated: the actual change was{" "}
+                {r.actual_change >= 0 ? "+" : ""}
+                {r.actual_change.toFixed(2)}.
+              </p>
+            )}
 
             <div className="result-grid">
               <div className="stat">

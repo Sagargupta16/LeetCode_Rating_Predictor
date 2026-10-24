@@ -1,7 +1,10 @@
-# Dev tools for linting, formatting and testing
-black==26.5.1
+# Dev tools for linting, formatting and testing, plus the HTTP and progress-bar
+# libraries scripts/ uses (the API itself needs neither)
+black==26.10.1
 ruff==0.16.10
 isort==8.0.1
 pre-commit==4.6.2
 pytest==9.1.1
 pytest-asyncio==1.4.0
+requests==2.34.2
+tqdm==4.70.1

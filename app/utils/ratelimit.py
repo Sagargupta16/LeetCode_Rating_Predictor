@@ -14,6 +14,8 @@ from collections import deque
 
 from fastapi import HTTPException, Request
 
+from app.config import CLIENT_IP_HEADER
+
 
 class RateLimiter:
     def __init__(self, max_requests: int, window_seconds: int):
@@ -24,6 +26,7 @@ class RateLimiter:
         self.max_requests = max_requests
         self.window = window_seconds
         self._hits: dict[str, deque[float]] = {}
+        self._next_sweep = 0.0
 
     def _prune(self, bucket: deque[float], now: float) -> None:
         cutoff = now - self.window
@@ -33,6 +36,11 @@ class RateLimiter:
     def check(self, key: str) -> None:
         """Record a hit for ``key``, raising 429 once the window is full."""
         now = time.monotonic()
+        # Every client that ever called leaves a bucket behind, so sweep the
+        # expired ones once per window instead of letting the dict grow.
+        if now >= self._next_sweep:
+            self.cleanup()
+            self._next_sweep = now + self.window
         bucket = self._hits.setdefault(key, deque())
         self._prune(bucket, now)
 
@@ -57,9 +65,16 @@ class RateLimiter:
 
 
 def client_key(request: Request) -> str:
-    """Identify the caller. Trusts the first X-Forwarded-For hop when present,
-    since the app runs behind a proxy on Render."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Identify the caller.
+
+    Uses ``CLIENT_IP_HEADER`` when one is configured and present, since only a
+    proxy that overwrites the header makes it trustworthy (Cloudflare sets
+    CF-Connecting-IP in front of Render). Otherwise the socket peer.
+    X-Forwarded-For is never read: its first entry is client-supplied, so
+    keying on it let anyone skip the limit by sending a new value each time.
+    """
+    if CLIENT_IP_HEADER:
+        forwarded = request.headers.get(CLIENT_IP_HEADER, "").strip()
+        if forwarded:
+            return forwarded
     return request.client.host if request.client else "unknown"

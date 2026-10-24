@@ -17,8 +17,8 @@ Usage:
     python scripts/backtest.py --cache   # reuse .cache/histories.json
 
 The report goes to stdout (JSON, or markdown with ``--markdown``) and progress
-goes to stderr. ``--weights`` and ``--scaler`` are relative to the repository
-root and must stay inside it.
+goes to stderr. ``--weights`` and ``--scaler`` name a file under ``models/`` or
+``.cache/``, relative to the repository root.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ import argparse
 import hashlib
 import json
 import math
-import os
 import statistics
 import sys
 import time
@@ -39,11 +38,7 @@ CACHE_PATH = REPO_ROOT / ".cache" / "histories.json"
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.model_loader import load_model, load_scaler  # noqa: E402
-from app.services.features import (  # noqa: E402
-    DEFAULT_RATING,
-    build_features,
-    summarize_history,
-)
+from app.services.features import replay_features  # noqa: E402
 from scripts.update_data import (  # noqa: E402
     DEFAULT_MAX_USERS,
     build_session,
@@ -68,13 +63,24 @@ query userContestRankingInfo($username: String!) {
 """
 
 
-def repo_file(value):
-    """Resolve a path argument inside the repository; refuse anything outside."""
-    root = os.path.realpath(REPO_ROOT)
-    path = os.path.realpath(os.path.join(root, value))
-    if os.path.commonpath([root, path]) != root:
-        raise SystemExit(f"{value}: path must be inside the repository")
-    return Path(path)
+def artifact_file(value):
+    """Pick the model artifact named by ``value`` from models/ or .cache/.
+
+    The argument only selects among files that already exist there, so the
+    path that gets read always comes from the directory listing, never from
+    the command line.
+    """
+    candidates = {
+        path.relative_to(REPO_ROOT).as_posix(): path
+        for folder in (REPO_ROOT / "models", CACHE_PATH.parent)
+        if folder.is_dir()
+        for path in folder.rglob("*")
+        if path.is_file()
+    }
+    key = Path(value).as_posix()
+    if key not in candidates:
+        raise SystemExit(f"{value}: not a file under models/ or .cache/")
+    return candidates[key]
 
 
 def sample_order(usernames, seed):
@@ -103,11 +109,7 @@ def replay_user(history, last, since_ts, model, scaler):
         if (entry.get("contest") or {}).get("startTime", 0) < since_ts:
             continue
 
-        before = history[:j]
-        prior = [h for h in before if h.get("attended") and h.get("rating")]
-        rating = prior[-1]["rating"] if prior else DEFAULT_RATING
-        user = summarize_history(before)
-        features = build_features(user, rating, entry["ranking"], user["contestIndex"])
+        features, rating = replay_features(history, j, entry["ranking"])
         predicted = float(model.predict(scaler.transform(features))[0][0])
         yield entry["contest"]["titleSlug"], predicted, entry["rating"] - rating
 
@@ -240,8 +242,8 @@ def score_pool(pool, args, model, scaler, since_ts, cached):
 
 def main() -> int:
     args = parse_args()
-    model = load_model(repo_file(args.weights))
-    scaler = load_scaler(repo_file(args.scaler))
+    model = load_model(artifact_file(args.weights))
+    scaler = load_scaler(artifact_file(args.scaler))
 
     usernames = json.loads((REPO_ROOT / "data" / "usernames.json").read_text())
     pool = sample_order(usernames[args.pool_start :], args.seed)
