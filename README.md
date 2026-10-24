@@ -16,7 +16,7 @@
 [![NumPy](https://img.shields.io/badge/inference-NumPy-orange.svg)](https://numpy.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page and runs the model in your browser. The model is published on the Hugging Face Hub as [`sagargupta16/leetcode-rating-predictor`](https://huggingface.co/sagargupta16/leetcode-rating-predictor).
+Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page and runs the model in your browser. The model is published on the Hugging Face Hub as [`Sagargupta1610/leetcode-rating-predictor`](https://huggingface.co/Sagargupta1610/leetcode-rating-predictor).
 
 On recent contests of users the model never trained on, it is off by **9.11 and 7.58 rating points** on average in two samples of 50 users, and gets the direction of the change right 90.8% and 90.6% of the time. See [Performance](#performance).
 
@@ -243,7 +243,7 @@ page's own pagination.
   change LeetCode applied. `extension/inference.test.js` checks it against
   outputs of the Python code (`tests/fixtures/extension_parity.json`): the
   features match exactly and predictions within 1e-5.
-- **Model**: `model.json` from [`sagargupta16/leetcode-rating-predictor`](https://huggingface.co/sagargupta16/leetcode-rating-predictor)
+- **Model**: `model.json` from [`Sagargupta1610/leetcode-rating-predictor`](https://huggingface.co/Sagargupta1610/leetcode-rating-predictor)
   on the Hugging Face Hub, cached and re-checked once a day, so a retrain reaches
   every install without a store release. A model built for other inputs
   (`feature_version`) is refused. Clicking the toolbar button shows the model
@@ -381,7 +381,7 @@ This fetches contest history via GraphQL and writes `data/data.json` locally
 (not committed). `scripts/export_dataset.py` turns it into Parquet, one file per
 split, with the 15 features under their names, the rating change, an anonymous
 user id and the by-user split, and `--upload` pushes it with a dataset card to
-the Hub dataset repo `sagargupta16/leetcode-contest-rating-changes`. The weekly
+the Hub dataset repo `Sagargupta1610/leetcode-contest-rating-changes`. The weekly
 job does both; it needs an `HF_TOKEN` secret with write access to that repo.
 
 Two guards worth knowing about, both there because the weekly job once opened a

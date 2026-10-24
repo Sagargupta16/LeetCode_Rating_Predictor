@@ -6,7 +6,7 @@
   // The model is published on the Hugging Face Hub, so a retrain reaches the
   // extension without a store release.
   const MODEL_URL =
-    "https://huggingface.co/sagargupta16/leetcode-rating-predictor/resolve/main/model.json";
+    "https://huggingface.co/Sagargupta1610/leetcode-rating-predictor/resolve/main/model.json";
   const MODEL_FORMAT = "leetcode-rating-predictor/dense-v1";
   // Bumped with the model's feature_version whenever the inputs change, so an
   // old extension never feeds a new model the wrong vector.

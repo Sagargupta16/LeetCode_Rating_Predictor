@@ -20,17 +20,21 @@
   file, written by `scripts/publish_model.py` from `weights.npz` and
   `scaler.json`. A test fails if it drifts from them; its float64 forward pass
   matches the API's float32 one within 8e-6.
-- **Model repo on the Hub**, `sagargupta16/leetcode-rating-predictor`:
+- **Model repo on the Hub**, `Sagargupta1610/leetcode-rating-predictor`:
   `scripts/publish_model.py --upload` pushes `models/`, `model.keras`,
   `docs/backtest.md` and a model card whose numbers are read from
-  `models/metrics.json` and the backtest.
-- **Dataset repo on the Hub**, `sagargupta16/leetcode-contest-rating-changes`
+  `models/metrics.json` and the backtest. Published at revision `4bad397`; the
+  extension loaded it from there and predicted 23 of 23 rows on page 4 of the
+  same ranking.
+- **Dataset repo on the Hub**, `Sagargupta1610/leetcode-contest-rating-changes`
   (created private): `scripts/export_dataset.py` writes the records as Parquet,
   one file per split, with the 15 features under their names, the rating change,
   an anonymous user id and the by-user split. The 2026-10-18 training data comes
   to the same 242,108 / 26,093 / 27,698 rows as `models/metrics.json`, and
   `train.py` reads identical rows from it as from the JSON. The 295,899 records
-  are 15.3 MB as Parquet against 68.5 MB as JSON.
+  are 15.3 MB as Parquet against 68.5 MB as JSON. Published with that version
+  tagged `training-2026-10-18` and the 2026-10-20 refresh (296,085 rows) on
+  `main`; it stays private until LeetCode's terms are settled.
 - `extension/inference.test.js` checks the JavaScript port against
   `tests/fixtures/extension_parity.json`, which `scripts/make_parity_fixture.py`
   generates from the Python feature code; features match exactly. CI now runs

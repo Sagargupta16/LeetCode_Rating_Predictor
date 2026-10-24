@@ -28,8 +28,8 @@ import numpy as np  # noqa: E402
 from app.model_loader import load_model, load_scaler  # noqa: E402
 from app.services.features import FEATURE_NAMES  # noqa: E402
 
-MODEL_REPO = "sagargupta16/leetcode-rating-predictor"
-DATASET_REPO = "sagargupta16/leetcode-contest-rating-changes"
+MODEL_REPO = "Sagargupta1610/leetcode-rating-predictor"
+DATASET_REPO = "Sagargupta1610/leetcode-contest-rating-changes"
 GITHUB_URL = "https://github.com/Sagargupta16/LeetCode_Rating_Predictor"
 WEB_APP_URL = "https://leetcode-rating-predictor.onrender.com"
 

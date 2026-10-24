@@ -39,7 +39,7 @@ artifacts, `models/model.json`, `models/metrics.json` and
 `python scripts/publish_model.py --upload` (needs `hf auth login` with write
 access); installed extensions pick it up within a day.
 
-The training records live in the Hub dataset `sagargupta16/leetcode-contest-rating-changes`,
+The training records live in the Hub dataset `Sagargupta1610/leetcode-contest-rating-changes`,
 which the weekly refresh updates; `train.py` reads it by default.
 
 `tests/test_model_artifacts.py` pins the prediction for a fixed input. A
