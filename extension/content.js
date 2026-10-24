@@ -135,7 +135,7 @@
     while (active < MAX_CONCURRENT_HISTORY && queue.length) {
       const { username, resolve, reject } = queue.shift();
       active += 1;
-      fetchHistory(username)
+      void fetchHistory(username)
         .then(resolve, reject)
         .finally(() => {
           active -= 1;

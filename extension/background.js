@@ -18,10 +18,16 @@ let inflight = null;
 let lastFailure = 0;
 
 // The content script caches contest histories in session storage, which only
-// extension pages can reach by default.
-void chrome.storage.session
-  .setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" })
-  .catch(() => {});
+// extension pages can reach by default. It asks for the model before its first
+// read, so granting access while answering that message is early enough, and a
+// service worker cannot use top-level await to do it at startup.
+async function allowContentScriptsSessionStorage() {
+  try {
+    await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" });
+  } catch {
+    // Without access the content script just refetches histories.
+  }
+}
 
 async function fetchModel() {
   const response = await fetch(MODEL_URL, { cache: "no-cache" });
@@ -67,11 +73,15 @@ async function getModel(force) {
   }
 }
 
+async function answer(message) {
+  await allowContentScriptsSessionStorage();
+  const { model, revision, fetchedAt } = await getModel(message.type === "refresh-model");
+  return { model, revision, fetchedAt };
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== "model" && message?.type !== "refresh-model") return false;
-  getModel(message.type === "refresh-model")
-    .then(({ model, revision, fetchedAt }) => sendResponse({ model, revision, fetchedAt }))
-    .catch(() => sendResponse({ error: "model-unavailable" }));
+  answer(message).then(sendResponse, () => sendResponse({ error: "model-unavailable" }));
   return true; // keep the channel open for the async answer
 });
 

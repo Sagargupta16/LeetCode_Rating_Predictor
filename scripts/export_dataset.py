@@ -9,7 +9,10 @@ those files and a dataset card to the Hub.
 Usage:
     python scripts/export_dataset.py                         # write data/hub/
     python scripts/export_dataset.py --upload                # and push it
-    python scripts/export_dataset.py --upload --tag training-2026-10-18
+    python scripts/export_dataset.py --source data/data-2026-10-18.json \
+        --upload --tag training-2026-10-18                   # a kept snapshot
+
+--source names a .json file in data/ (data/data*.json is gitignored).
 
 --upload needs a Hub login with write access (`hf auth login`, or HF_TOKEN).
 The repo is created private; publishing it is a separate, deliberate step.
@@ -29,9 +32,14 @@ import numpy as np  # noqa: E402
 
 from app.services.features import FEATURE_NAMES  # noqa: E402
 from scripts.publish_model import DATASET_REPO, GITHUB_URL, MODEL_REPO  # noqa: E402
-from scripts.train import assign_splits, read_ndjson, user_groups  # noqa: E402
+from scripts.train import (  # noqa: E402
+    assign_splits,
+    data_file,
+    read_ndjson,
+    user_groups,
+)
 
-SOURCE = REPO_ROOT / "data" / "data.json"
+SOURCE = "data/data.json"
 OUT_DIR = REPO_ROOT / "data" / "hub"
 SPLITS = ("train", "validation", "test")
 
@@ -237,12 +245,14 @@ def read_hub_dataset(revision: str = "main"):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--source", type=Path, default=SOURCE, help="NDJSON input")
+    parser.add_argument(
+        "--source", default=SOURCE, help="NDJSON records, a .json file in data/"
+    )
     parser.add_argument("--upload", action="store_true", help="push to the Hub")
     parser.add_argument("--tag", help="also tag the uploaded commit")
     args = parser.parse_args()
 
-    records = read_ndjson(args.source)
+    records = read_ndjson(data_file(args.source))
     table = build_table(records)
     counts = write_splits(table, OUT_DIR)
     s = stats(table, counts)

@@ -267,9 +267,15 @@
     if (!isNumberArray(scaler.scale, model.input_dim) || !isNumberArray(scaler.min, model.input_dim)) {
       throw new Error("scaler does not match input_dim");
     }
-    if (!Array.isArray(model.layers) || !model.layers.length) throw new Error("model has no layers");
-    let width = model.input_dim;
-    for (const [i, layer] of model.layers.entries()) {
+    validateLayers(model.layers, model.input_dim);
+    return model;
+  }
+
+  /** Throws unless `layers` chain from `inputDim` inputs down to one output. */
+  function validateLayers(layers, inputDim) {
+    if (!Array.isArray(layers) || !layers.length) throw new Error("model has no layers");
+    let width = inputDim;
+    for (const [i, layer] of layers.entries()) {
       if (layer.activation !== "relu" && layer.activation !== "linear") {
         throw new Error(`layer ${i}: unsupported activation ${layer.activation}`);
       }
@@ -287,7 +293,6 @@
       width = units;
     }
     if (width !== 1) throw new Error(`output width ${width}, expected 1`);
-    return model;
   }
 
   /** Scale the inputs and run the Dense stack; returns the rating change. */

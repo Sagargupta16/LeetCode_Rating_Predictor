@@ -53,6 +53,23 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
+def data_file(value: str) -> Path:
+    """Pick the records file named by ``value`` from data/; refuse anything else.
+
+    The argument only selects among files that already exist there, so the path
+    that gets read always comes from the directory listing, never from the
+    command line.
+    """
+    candidates = {
+        path.relative_to(REPO_ROOT).as_posix(): path
+        for path in (REPO_ROOT / "data").glob("*.json")
+    }
+    key = Path(value).as_posix()
+    if key not in candidates:
+        raise SystemExit(f"{value}: not a .json file in data/")
+    return candidates[key]
+
+
 def read_ndjson(path: Path) -> list[dict]:
     """The records ``scripts/update_data.py`` writes, one JSON object per line."""
     with path.open(encoding="utf-8") as f:
@@ -115,7 +132,7 @@ def load_records(
             np.asarray(table["split"].to_pylist()),
         )
 
-    records = read_ndjson(REPO_ROOT / data)
+    records = read_ndjson(data_file(data))
     groups = user_groups(records)
     x = np.array([[r[f"f{i}"] for i in range(1, NUM_FEATURES + 1)] for r in records])
     y = np.array([r["output"] for r in records])

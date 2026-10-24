@@ -34,6 +34,8 @@ GITHUB_URL = "https://github.com/Sagargupta16/LeetCode_Rating_Predictor"
 WEB_APP_URL = "https://leetcode-rating-predictor.onrender.com"
 
 MODELS = REPO_ROOT / "models"
+WEIGHTS = MODELS / "weights.npz"
+SCALER = MODELS / "scaler.json"
 MODEL_JSON = MODELS / "model.json"
 METRICS = MODELS / "metrics.json"
 BACKTEST = REPO_ROOT / "docs" / "backtest.md"
@@ -52,12 +54,12 @@ def _float32(value) -> float:
 def build_model_json() -> dict:
     """The served network and scaler as plain lists, in model input order."""
     # Loading through the API's own loaders first rejects anything it would.
-    model = load_model(MODELS / "weights.npz")
-    load_scaler(MODELS / "scaler.json")
+    model = load_model(WEIGHTS)
+    load_scaler(SCALER)
 
-    scaler = json.loads((MODELS / "scaler.json").read_text(encoding="utf-8"))
+    scaler = json.loads(SCALER.read_text(encoding="utf-8"))
     metrics = json.loads(METRICS.read_text(encoding="utf-8"))
-    with np.load(MODELS / "weights.npz") as archive:
+    with np.load(WEIGHTS) as archive:
         meta = json.loads(str(archive["meta"]))
         layers = [
             {
@@ -100,9 +102,11 @@ def _backtest_rows() -> dict[str, str]:
     """Metric -> value from the table in docs/backtest.md."""
     rows = {}
     for line in BACKTEST.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^\|\s*([^|]+?)\s*\|\s*\**([^|*]+?)\**\s*\|$", line)
-        if match and match.group(1) not in ("Metric", "---"):
-            rows[match.group(1)] = match.group(2)
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip().strip("*") for cell in line.strip().strip("|").split("|")]
+        if len(cells) == 2 and cells[0] != "Metric" and not cells[0].startswith("-"):
+            rows[cells[0]] = cells[1]
     return rows
 
 
@@ -237,17 +241,11 @@ def upload() -> None:
         link_dataset = not api.dataset_info(DATASET_REPO).private
     except RepositoryNotFoundError:
         link_dataset = False
-    files = {
-        "model.json": MODEL_JSON,
-        "weights.npz": MODELS / "weights.npz",
-        "scaler.json": MODELS / "scaler.json",
-        "metrics.json": METRICS,
-        "model.keras": REPO_ROOT / "model.keras",
-        "backtest.md": BACKTEST,
-    }
+    files = [MODEL_JSON, WEIGHTS, SCALER, METRICS, REPO_ROOT / "model.keras", BACKTEST]
+    # Flat in the repo root, under their own file names.
     operations = [
-        CommitOperationAdd(path_in_repo=name, path_or_fileobj=str(path))
-        for name, path in files.items()
+        CommitOperationAdd(path_in_repo=path.name, path_or_fileobj=str(path))
+        for path in files
     ]
     operations.append(
         CommitOperationAdd(
