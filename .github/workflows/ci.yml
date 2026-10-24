@@ -38,6 +38,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
+      # Every *.test.js, including the parity check against the Python model.
       - name: Extension tests
         working-directory: extension
-        run: node --test core.test.js
+        run: node --test

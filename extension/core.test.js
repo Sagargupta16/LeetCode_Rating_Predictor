@@ -1,4 +1,4 @@
-// Run with: node --test extension/
+// Run with: node --test (from extension/)
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const core = require("./core.js");
@@ -49,23 +49,31 @@ test("formats deltas with a sign and one decimal", () => {
   assert.equal(core.formatDelta(0.04), "0.0");
 });
 
-test("normalizes the API base and rejects non-http URLs", () => {
-  assert.equal(core.normalizeApiBase(""), core.DEFAULT_API_BASE);
-  assert.equal(core.normalizeApiBase(" http://localhost:8000/ "), "http://localhost:8000");
-  assert.equal(core.normalizeApiBase("https://example.com/api/"), "https://example.com/api");
-  assert.equal(core.normalizeApiBase("javascript:alert(1)"), null);
-  assert.equal(core.normalizeApiBase("not a url"), null);
+test("keys a badge by contest, user and rank", () => {
+  assert.equal(core.predictionKey("weekly-contest-524", "zee_man", 12), "p:weekly-contest-524:zee_man:12");
 });
 
-test("summarizes a predict response", () => {
+test("reads history and current rating from a GraphQL response", () => {
+  const entry = { attended: true, rating: 1612.2, ranking: 1500 };
   assert.deepEqual(
-    core.summarizePrediction([
-      { prediction: 21.5, rating_before_contest: 1800, rating_after_contest: 1821.5 },
-    ]),
-    { delta: 21.5, before: 1800, after: 1821.5 },
+    core.parseHistoryPayload({
+      data: { userContestRanking: { rating: 1612.2 }, userContestRankingHistory: [entry] },
+    }),
+    { history: [entry], currentRating: 1612.2 },
   );
-  assert.equal(core.summarizePrediction([]), null);
-  assert.equal(core.summarizePrediction({ detail: "x" }), null);
+  // An account before its first rated contest starts at 1500, like the API.
+  assert.deepEqual(
+    core.parseHistoryPayload({ data: { userContestRanking: null, userContestRankingHistory: null } }),
+    { history: [], currentRating: 1500 },
+  );
+  assert.equal(core.parseHistoryPayload({ errors: [{ message: "x" }], data: null }), null);
+  assert.equal(core.parseHistoryPayload(null), null);
+});
+
+test("asks GraphQL for every field the features read", () => {
+  for (const field of ["rating", "attended", "ranking", "problemsSolved", "totalProblems", "finishTimeInSeconds", "titleSlug"]) {
+    assert.ok(core.HISTORY_QUERY.includes(field), field);
+  }
 });
 
 test("clamps Retry-After", () => {

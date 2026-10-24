@@ -3,7 +3,7 @@
 #   orrery render docs/diagrams/architecture.yaml -o docs/diagrams/architecture -f svg --theme both
 # Reviewed at README width: orrery review docs/diagrams/architecture.yaml --width 880
 title: LeetCode Rating Predictor
-subtitle: One uvicorn process on Render serves the React app, the API and the NumPy model
+subtitle: Render serves the web app and the API; the extension runs the same model in your browser
 direction: right
 layout: { spacing: 0.6 }
 legend:
@@ -14,24 +14,26 @@ groups:
   render: { type: box, label: Render web service, icon: si:render, evidence: render.yaml:2 }
 
 nodes:
-  ext: { icon: logos:chrome, label: Chrome extension, note: on contest ranking pages, in: browser, evidence: [extension/manifest.json:17, extension/background.js:33] }
-  webapp: { icon: logos:react, label: Web app, note: "React 19, served from client/build", in: browser, evidence: [client/src/components/PredictionComponent.jsx:141, main.py:267] }
+  ext: { icon: logos:chrome, label: Chrome extension, note: runs the model in the browser, in: browser, evidence: [extension/manifest.json:15, extension/core.js:318] }
+  webapp: { icon: logos:react, label: Web app, note: "React 19, served from client/build", in: browser, evidence: [client/src/components/PredictionComponent.jsx:141, main.py:302] }
   warm: { icon: logos:github-actions, label: Keep-warm job, note: every 10 min, evidence: .github/workflows/keep-warm.yml:15 }
-  ranking: { icon: si:leetcode, label: LeetCode ranking JSON, note: the page's own ranks, evidence: extension/core.js:21 }
+  ranking: { icon: si:leetcode, label: LeetCode ranking JSON, note: the page's own ranks, evidence: extension/core.js:70 }
+  hub: { icon: logos:hugging-face-icon, label: Hugging Face Hub, note: "model.json, checked daily", evidence: [extension/core.js:8, extension/background.js:12] }
   api: { icon: logos:fastapi-icon, label: FastAPI, note: "/api/* routes, main.py", in: render, evidence: main.py:168 }
-  limiter: { icon: tabler:gauge, label: Rate limiter, note: 30 per minute per IP, in: render, evidence: app/utils/ratelimit.py:18 }
-  cache: { icon: github:cache, label: TTL cache, note: "in memory, Redis if REDIS_URL", in: render, evidence: app/utils/cache.py:64 }
+  limiter: { icon: tabler:gauge, label: Rate limiter, note: 30 per minute per client, in: render, evidence: app/utils/ratelimit.py:20 }
+  cache: { icon: github:cache, label: TTL cache, note: "in memory, Redis if REDIS_URL", in: render, evidence: app/utils/cache.py:71 }
   weights: { icon: tabler:file-database, label: Model artifacts, note: models/weights.npz + scaler.json, in: render, evidence: app/config.py:32 }
-  model: { icon: logos:numpy, label: Dense network, note: "15 features in, NumPy forward pass", in: render, evidence: [app/model_loader.py:25, app/services/features.py:72] }
+  model: { icon: logos:numpy, label: Dense network, note: "15 features in, NumPy forward pass", in: render, evidence: [app/model_loader.py:25, app/services/features.py:123] }
   graphql: { icon: logos:graphql, label: LeetCode GraphQL, note: histories and contests, evidence: app/config.py:7 }
 
 edges:
-  - ext -> ranking: { label: ranks, evidence: extension/content.js:20 }
-  - ext -> api: { label: one POST per row, evidence: extension/background.js:33 }
+  - ext -> ranking: { label: ranks, evidence: extension/content.js:45 }
+  - ext -> graphql: { label: "histories, same origin", evidence: extension/content.js:112 }
+  - ext -> hub: { label: model.json, evidence: extension/background.js:27 }
   - webapp -> api: { label: same origin, evidence: client/src/components/PredictionComponent.jsx:141 }
   - warm --> api: { label: /api/health, evidence: .github/workflows/keep-warm.yml:28 }
   - api -> limiter: { evidence: main.py:180 }
-  - api -> cache: { evidence: app/services/leetcode.py:99 }
-  - api -> graphql: { label: on cache miss, evidence: app/services/leetcode.py:105 }
-  - api -> model: { evidence: main.py:219 }
+  - api -> cache: { evidence: app/services/leetcode.py:100 }
+  - api -> graphql: { label: on cache miss, evidence: app/services/leetcode.py:104 }
+  - api -> model: { evidence: main.py:250 }
   - weights -> model: { label: loaded at startup, evidence: main.py:75 }

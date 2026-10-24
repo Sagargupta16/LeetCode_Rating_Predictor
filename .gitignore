@@ -85,6 +85,11 @@ coverage.xml
 model_backup/
 models/history/
 
+# Training records live on the Hugging Face Hub (scripts/export_dataset.py);
+# these are the local fetch, kept snapshots of it and its Parquet export.
+data/data*.json
+data/hub/
+
 # Claude Code
 CLAUDE.md
 .claude

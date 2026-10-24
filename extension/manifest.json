@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "LeetCode Rating Predictor",
-  "version": "2.5.0",
-  "description": "Shows a predicted rating change next to every name on LeetCode contest ranking pages.",
+  "version": "2.6.0",
+  "description": "Shows a predicted rating change next to every name on LeetCode contest ranking pages. Predictions run in your browser.",
   "homepage_url": "https://github.com/Sagargupta16/LeetCode_Rating_Predictor",
   "icons": {
     "16": "icons/icon16.png",
@@ -25,13 +25,12 @@
     "open_in_tab": false
   },
   "action": {
-    "default_title": "LeetCode Rating Predictor settings",
+    "default_title": "LeetCode Rating Predictor model status",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png"
     }
   },
   "permissions": ["storage"],
-  "host_permissions": ["https://leetcode-rating-predictor.onrender.com/*"],
-  "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"]
+  "host_permissions": ["https://huggingface.co/*"]
 }

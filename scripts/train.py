@@ -11,15 +11,20 @@ only, then writes the same artifacts the notebook does:
 Run ``python scripts/export_model.py`` afterwards to refresh the NumPy artifacts
 the API serves.
 
-data/data.json stores no user id, but each user's records are written
-contiguously and chain: a record's rating is the previous record's rating plus
-its rating change. A break in that chain is a user boundary. On the 2026-10-18
-dataset the chain breaks (8,182) match the records that look like a first
-contest (rating 1500, no history) one for one.
+The data comes from the Hub dataset by default (``--data hub``), which carries
+a user id and the split per row, so the split is the published one. A local
+``data/data.json`` from ``scripts/update_data.py`` works too. Older copies of it
+store no user id, but each user's records are written contiguously and chain: a
+record's rating is the previous record's rating plus its rating change, so a
+break in that chain is a user boundary. On the 2026-10-18 dataset the chain
+breaks (8,182) match the records that look like a first contest (rating 1500,
+no history) one for one.
 
 Usage:
     pip install -r requirements-ml.txt
-    python scripts/train.py
+    python scripts/train.py                                  # latest Hub data
+    python scripts/train.py --revision training-2026-10-18   # a tagged version
+    python scripts/train.py --data data/data.json            # a local fetch
 """
 
 from __future__ import annotations
@@ -27,12 +32,17 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
+from app.services.features import FEATURE_NAMES  # noqa: E402
+
 NUM_FEATURES = 15
 CHAIN_TOLERANCE = 0.01
 # Rating changes are tens of points, so a delta of 10 keeps Huber quadratic for
@@ -43,24 +53,43 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
-def load_records(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Features, targets and a user group id per record."""
-    features, targets, groups = [], [], []
+def data_file(value: str) -> Path:
+    """Pick the records file named by ``value`` from data/; refuse anything else.
+
+    The argument only selects among files that already exist there, so the path
+    that gets read always comes from the directory listing, never from the
+    command line.
+    """
+    candidates = {
+        path.relative_to(REPO_ROOT).as_posix(): path
+        for path in (REPO_ROOT / "data").glob("*.json")
+    }
+    key = Path(value).as_posix()
+    if key not in candidates:
+        raise SystemExit(f"{value}: not a .json file in data/")
+    return candidates[key]
+
+
+def read_ndjson(path: Path) -> list[dict]:
+    """The records ``scripts/update_data.py`` writes, one JSON object per line."""
+    with path.open(encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def user_groups(records: list[dict]) -> np.ndarray:
+    """A user group id per record: ``user_id`` when present, else chain breaks."""
+    if records and all("user_id" in r for r in records):
+        return np.array([r["user_id"] for r in records])
+    groups = []
     group = -1
     previous = None
-    with path.open(encoding="utf-8") as f:
-        for line in f:
-            if not line.strip():
-                continue
-            record = json.loads(line)
-            expected = previous["f1"] + previous["output"] if previous else None
-            if expected is None or abs(record["f1"] - expected) > CHAIN_TOLERANCE:
-                group += 1
-            features.append([record[f"f{i}"] for i in range(1, NUM_FEATURES + 1)])
-            targets.append(record["output"])
-            groups.append(group)
-            previous = record
-    return np.array(features), np.array(targets), np.array(groups)
+    for record in records:
+        expected = previous["f1"] + previous["output"] if previous else None
+        if expected is None or abs(record["f1"] - expected) > CHAIN_TOLERANCE:
+            group += 1
+        groups.append(group)
+        previous = record
+    return np.array(groups)
 
 
 def split_users(groups: np.ndarray, fraction: float, rng) -> np.ndarray:
@@ -68,6 +97,46 @@ def split_users(groups: np.ndarray, fraction: float, rng) -> np.ndarray:
     users = np.unique(groups)
     chosen = rng.choice(users, size=round(len(users) * fraction), replace=False)
     return np.isin(groups, chosen)
+
+
+def assign_splits(
+    groups: np.ndarray, seed: int, test_users: float, val_users: float
+) -> np.ndarray:
+    """ "train", "validation" or "test" per record, split by user.
+
+    The Hub dataset stores this column, so it has to stay the exact procedure
+    the 2026-10-18 model was trained with: test users first, then validation
+    users from the rest, from one generator seeded with ``seed``.
+    """
+    rng = np.random.default_rng(seed)
+    test = split_users(groups, test_users, rng)
+    rest = ~test
+    val = np.zeros_like(test)
+    val[rest] = split_users(groups[rest], val_users, rng)
+    return np.where(test, "test", np.where(val, "validation", "train"))
+
+
+def load_records(
+    data: str, revision: str, seed: int, test_users: float, val_users: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Features, targets, user groups and split labels for ``--data``."""
+    if data == "hub":
+        from scripts.export_dataset import read_hub_dataset
+
+        table = read_hub_dataset(revision)
+        x = np.column_stack([table[name].to_numpy() for name in FEATURE_NAMES])
+        return (
+            x,
+            table["rating_change"].to_numpy(),
+            table["user_id"].to_numpy(),
+            np.asarray(table["split"].to_pylist()),
+        )
+
+    records = read_ndjson(data_file(data))
+    groups = user_groups(records)
+    x = np.array([[r[f"f{i}"] for i in range(1, NUM_FEATURES + 1)] for r in records])
+    y = np.array([r["output"] for r in records])
+    return x, y, groups, assign_splits(groups, seed, test_users, val_users)
 
 
 def build_model(tf, loss: str):
@@ -103,7 +172,14 @@ def scores(predicted: np.ndarray, actual: np.ndarray) -> dict[str, float]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--data", default="data/data.json")
+    parser.add_argument(
+        "--data",
+        default="hub",
+        help="'hub' for the Hub dataset, or an NDJSON path from update_data.py",
+    )
+    parser.add_argument(
+        "--revision", default="main", help="Hub dataset branch, tag or commit"
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--test-users", type=float, default=0.1)
     parser.add_argument("--val-users", type=float, default=0.1)
@@ -127,17 +203,14 @@ def main() -> int:
     from sklearn.preprocessing import MinMaxScaler
 
     tf.keras.utils.set_random_seed(args.seed)
-    rng = np.random.default_rng(args.seed)
 
-    x, y, groups = load_records(REPO_ROOT / args.data)
-    users = int(groups.max()) + 1
+    x, y, groups, splits = load_records(
+        args.data, args.revision, args.seed, args.test_users, args.val_users
+    )
+    users = len(np.unique(groups))
     logger.info(f"{len(y):,} records from {users:,} users")
 
-    test = split_users(groups, args.test_users, rng)
-    rest = ~test
-    val = np.zeros_like(test)
-    val[rest] = split_users(groups[rest], args.val_users, rng)
-    train = rest & ~val
+    train, val, test = (splits == name for name in ("train", "validation", "test"))
     logger.info(
         f"train {train.sum():,} / val {val.sum():,} / test {test.sum():,} records"
     )

@@ -135,6 +135,21 @@ def test_rejects_implausible_output(scaler):
     assert exc_info.value.status_code == 500
 
 
+def test_model_json_matches_the_exported_artifacts():
+    """models/model.json is what the extension runs; it must not drift."""
+    from scripts.publish_model import MODEL_JSON, build_model_json
+
+    assert json.loads(MODEL_JSON.read_text(encoding="utf-8")) == build_model_json()
+
+
+def test_model_json_predicts_like_the_api():
+    from scripts.publish_model import MODEL_JSON, predict_from_model_json
+
+    payload = json.loads(MODEL_JSON.read_text(encoding="utf-8"))
+    result = predict_from_model_json(payload, GOLDEN_FEATURES)
+    assert result == pytest.approx(GOLDEN_PREDICTION, abs=TOLERANCE)
+
+
 def test_dropout_free_network_is_pure_matmul():
     """Two identical calls must agree exactly; no dropout at inference."""
     net = DenseNetwork(

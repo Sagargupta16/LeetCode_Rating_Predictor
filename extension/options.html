@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LeetCode Rating Predictor settings</title>
+    <title>LeetCode Rating Predictor model status</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
@@ -11,24 +11,33 @@
       <h1>LeetCode Rating Predictor</h1>
       <p>
         Open any contest ranking page on leetcode.com and a Predicted column shows
-        each user's predicted rating change.
+        each user's predicted rating change. Predictions run in your browser: the
+        model comes from Hugging Face and each user's contest history from
+        leetcode.com, and nothing is sent anywhere else.
       </p>
-      <form id="settings">
-        <label for="apiBase">Predictor API</label>
-        <input id="apiBase" type="url" spellcheck="false" autocomplete="off" />
-        <p class="hint">
-          Defaults to the public demo. Point it at your own server (for example
-          <code>http://localhost:8000</code>) to run predictions locally.
-        </p>
-        <div class="row">
-          <button type="submit">Save</button>
-          <button type="button" id="check">Check connection</button>
-          <button type="button" id="reset">Use default</button>
-        </div>
-        <output id="status"></output>
-      </form>
+      <dl>
+        <dt>Model trained</dt>
+        <dd id="trained">not loaded yet</dd>
+        <dt>Revision</dt>
+        <dd id="revision">-</dd>
+        <dt>Fetched</dt>
+        <dd id="fetched">-</dd>
+      </dl>
+      <div class="row">
+        <button type="button" id="refresh">Check for a newer model</button>
+      </div>
+      <output id="status"></output>
+      <p class="hint">
+        Model:
+        <a
+          href="https://huggingface.co/Sagargupta1610/leetcode-rating-predictor"
+          target="_blank"
+          rel="noopener"
+          >Sagargupta1610/leetcode-rating-predictor</a
+        >
+        on Hugging Face. It is re-checked once a day.
+      </p>
     </main>
-    <script src="core.js"></script>
     <script type="module" src="options.js"></script>
   </body>
 </html>

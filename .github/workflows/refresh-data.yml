@@ -1,8 +1,8 @@
 name: Refresh training data
 
-# scripts/update_data.py existed but nothing ran it, so data/data.json drifted
-# out of date between manual runs. This refreshes it weekly and opens a PR for
-# review rather than committing to main directly.
+# Refreshes the training records weekly and publishes them to the Hugging Face
+# Hub dataset (scripts/export_dataset.py). The records are no longer committed,
+# so the only PR this opens is the regenerated docs/backtest.md.
 on:
   schedule:
     - cron: "0 6 * * 1"
@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+# A fine-grained token with write access to the dataset repo only.
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
 jobs:
   refresh:
@@ -24,14 +28,16 @@ jobs:
 
       - run: uv sync --locked --no-install-project --no-build
 
-      # The script refuses to overwrite data/data.json when a run comes back
-      # with far fewer records than are already committed, and exits non-zero
-      # instead. That fails this job and skips PR creation, which is the point:
-      # a throttled fetch used to sail through as a PR that deleted half the
-      # training set. Re-run the workflow; pass --force only for an intended
-      # shrink.
+      # The script exits non-zero when a run comes back with far fewer records
+      # than the published dataset holds. That fails this job before anything
+      # is uploaded, which is the point: a throttled fetch used to sail through
+      # as a PR that deleted half the training set. Re-run the workflow; pass
+      # --force only for an intended shrink.
       - name: Fetch latest contest data
-        run: uv run --no-sync --no-build python scripts/update_data.py
+        run: uv run --no-sync --no-build python scripts/update_data.py --baseline hub
+
+      - name: Publish the dataset to the Hub
+        run: uv run --no-sync --no-build python scripts/export_dataset.py --upload
 
       # Re-measure the served model on recent contests of users outside the
       # training slice, so the PR (and docs/backtest.md) carries a current
@@ -43,7 +49,7 @@ jobs:
           uv run --no-sync --no-build python scripts/backtest.py --markdown > "$RUNNER_TEMP/backtest.md"
           mv "$RUNNER_TEMP/backtest.md" docs/backtest.md
 
-      - name: Open a PR if the data changed
+      - name: Open a PR if the backtest changed
         # v7.0.8 ran `git remote prune origin` against checkout@v6's persisted
         # credentials, sending a duplicate Authorization header that GitHub
         # rejects with 400 (failed every scheduled run since 2026-08-17).
@@ -52,15 +58,16 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           branch: chore/refresh-training-data
-          commit-message: "chore(data): refresh contest training data and backtest"
-          title: "chore(data): refresh contest training data"
+          add-paths: docs/backtest.md
+          commit-message: "docs: refresh the weekly backtest"
+          title: "docs: refresh the weekly backtest"
           body: |
-            Automated weekly refresh of `data/data.json` via
-            `scripts/update_data.py`, plus a fresh `docs/backtest.md` from
-            `scripts/backtest.py` (recent contests of users outside the
-            training data).
+            Automated weekly run. `scripts/update_data.py` refreshed the
+            training records and `scripts/export_dataset.py` published them to
+            the Hugging Face Hub dataset; this PR only carries the new
+            `docs/backtest.md` from `scripts/backtest.py` (recent contests of
+            users outside the training data).
 
-            Retraining is a separate, manual step: see CONTRIBUTING.md. Merging
-            this only updates the training inputs, not the served model.
+            Retraining is a separate, manual step: see CONTRIBUTING.md.
           labels: dependencies
           delete-branch: true

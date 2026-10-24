@@ -1,128 +1,89 @@
-// Service worker: the only place that talks to the predictor API.
+// Service worker: owns the model.
 //
-// Content scripts run under leetcode.com's origin, so a fetch from there would
-// need the API to allow that origin. Host permissions let the service worker
-// call the API directly, and keeping the queue here means two open ranking tabs
-// share one rate-limit budget instead of racing each other.
+// Predictions run in the browser, so the only thing fetched here is the model
+// itself, from the Hugging Face Hub. It is cached in chrome.storage.local and
+// re-checked once a day, which lets a retrain reach every install without a
+// store release while ranking pages keep working offline from the cache.
 importScripts("core.js");
 
-const { DEFAULT_API_BASE, normalizeApiBase, predictionKey, summarizePrediction, retryAfterSeconds } =
-  self.LRP;
+const { MODEL_URL, validateModel } = self.LRP;
 
-const MAX_CONCURRENT = 2;
-const MAX_NETWORK_ATTEMPTS = 3;
-// The API allows 30 predictions per minute per IP, so a second ranking page in
-// the same minute is expected to hit 429. Waiting out Retry-After is the normal
-// path, not a failure; this only caps a server that never lets up.
-const MAX_THROTTLED_WAITS = 8;
+const MODEL_KEY = "model";
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+// After a failed refresh, keep serving the cached model and wait this long
+// before asking the Hub again, instead of retrying on every page view.
+const RETRY_AFTER_FAILURE_MS = 10 * 60 * 1000;
 
-const queue = [];
-let active = 0;
-let pausedUntil = 0; // shared by every request once the API says 429
+let inflight = null;
+let lastFailure = 0;
 
-async function apiBase() {
-  const { apiBase: stored } = await chrome.storage.sync.get("apiBase");
-  return normalizeApiBase(stored) || DEFAULT_API_BASE;
+// The content script caches contest histories in session storage, which only
+// extension pages can reach by default. It asks for the model before its first
+// read, so granting access while answering that message is early enough, and a
+// service worker cannot use top-level await to do it at startup.
+async function allowContentScriptsSessionStorage() {
+  try {
+    await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_AND_UNTRUSTED_CONTEXTS" });
+  } catch {
+    // Without access the content script just refetches histories.
+  }
 }
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function fetchModel() {
+  const response = await fetch(MODEL_URL, { cache: "no-cache" });
+  if (!response.ok) throw new Error(`model fetch failed: HTTP ${response.status}`);
+  const model = validateModel(await response.json());
+  const entry = {
+    model,
+    revision: response.headers.get("X-Repo-Commit"),
+    fetchedAt: Date.now(),
+  };
+  await chrome.storage.local.set({ [MODEL_KEY]: entry });
+  return entry;
+}
 
-// One POST to the API; null when the network itself failed.
-async function postPredict(base, body) {
+async function cachedModel() {
+  const entry = (await chrome.storage.local.get(MODEL_KEY))[MODEL_KEY];
+  if (!entry) return null;
   try {
-    return await fetch(`${base}/api/predict`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    });
+    // A cache written by an older extension version may not fit this one.
+    validateModel(entry.model);
+    return entry;
   } catch {
     return null;
   }
 }
 
-// What a final (non-429) response means for the badge.
-async function readAnswer(response) {
-  if (response.status === 400 || response.status === 422) return { error: "no-history" };
-  if (!response.ok) return { error: "unavailable" };
-  const summary = summarizePrediction(await response.json());
-  return summary || { error: "unavailable" };
-}
+async function getModel(force) {
+  const cached = await cachedModel();
+  const stale = !cached || Date.now() - cached.fetchedAt > MAX_AGE_MS;
+  const backingOff = Date.now() - lastFailure < RETRY_AFTER_FAILURE_MS;
+  if (cached && !force && (!stale || backingOff)) return cached;
 
-async function requestPrediction({ contest, username, rank }) {
-  const base = await apiBase();
-  const body = JSON.stringify({ username, contests: [{ name: contest, rank }] });
-  let networkErrors = 0;
-  let throttled = 0;
-  for (;;) {
-    const wait = pausedUntil - Date.now();
-    if (wait > 0) await sleep(wait);
-
-    const response = await postPredict(base, body);
-    if (!response) {
-      networkErrors += 1;
-      if (networkErrors >= MAX_NETWORK_ATTEMPTS) return { error: "unreachable" };
-      await sleep(3000 * networkErrors);
-    } else if (response.status === 429) {
-      throttled += 1;
-      if (throttled > MAX_THROTTLED_WAITS) return { error: "rate-limited" };
-      const seconds = retryAfterSeconds(response.headers.get("Retry-After"));
-      pausedUntil = Math.max(pausedUntil, Date.now() + seconds * 1000);
-    } else {
-      return readAnswer(response);
-    }
+  inflight ??= fetchModel().finally(() => {
+    inflight = null;
+  });
+  try {
+    return await inflight;
+  } catch (error) {
+    lastFailure = Date.now();
+    // Pages keep predicting from the cache; an explicit check reports failure.
+    if (cached && !force) return cached;
+    throw error;
   }
 }
 
-async function predict(job) {
-  const key = predictionKey(job.contest, job.username, job.rank);
-  const cached = (await chrome.storage.session.get(key))[key];
-  if (cached) return cached;
-
-  const result = await requestPrediction(job);
-  // Only cache real answers; a cold or throttled API should be retried later.
-  if (!result.error || result.error === "no-history") {
-    await chrome.storage.session.set({ [key]: result });
-  }
-  return result;
-}
-
-// A service worker with no events for 30 s is stopped, even mid-wait. Any
-// extension API call resets that timer, so tick one while work is pending: a
-// cold free-tier API takes ~30 s to answer and a 429 pause can last a minute.
-let keepAlive = null;
-
-function updateKeepAlive() {
-  if (active || queue.length) {
-    keepAlive ??= setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
-  } else if (keepAlive) {
-    clearInterval(keepAlive);
-    keepAlive = null;
-  }
-}
-
-function pump() {
-  updateKeepAlive();
-  while (active < MAX_CONCURRENT && queue.length) {
-    const { job, resolve } = queue.shift();
-    active += 1;
-    void predict(job)
-      .catch(() => ({ error: "unavailable" }))
-      .then(resolve)
-      .finally(() => {
-        active -= 1;
-        pump();
-      });
-  }
+async function answer(message) {
+  await allowContentScriptsSessionStorage();
+  const { model, revision, fetchedAt } = await getModel(message.type === "refresh-model");
+  return { model, revision, fetchedAt };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === "predict") {
-    queue.push({ job: message, resolve: sendResponse });
-    pump();
-    return true; // keep the channel open for the async answer
-  }
-  return false;
+  if (message?.type !== "model" && message?.type !== "refresh-model") return false;
+  answer(message).then(sendResponse, () => sendResponse({ error: "model-unavailable" }));
+  return true; // keep the channel open for the async answer
 });
 
-// The toolbar button opens the settings page.
+// The toolbar button opens the model status page.
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());

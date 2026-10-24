@@ -16,7 +16,7 @@
 [![NumPy](https://img.shields.io/badge/inference-NumPy-orange.svg)](https://numpy.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page.
+Predict your LeetCode contest rating change from your rank, with a Dense neural network trained on 242,108 contest records (the dataset holds 295,899 records from 8,182 users; the rest are held out by user). Use the web app (enter a username, hit **Auto-fill** to pull your real ranks) or the [browser extension](#browser-extension), which adds a **Predicted** column to every LeetCode contest ranking page and runs the model in your browser. The model is published on the Hugging Face Hub as [`Sagargupta1610/leetcode-rating-predictor`](https://huggingface.co/Sagargupta1610/leetcode-rating-predictor).
 
 On recent contests of users the model never trained on, it is off by **9.11 and 7.58 rating points** on average in two samples of 50 users, and gets the direction of the change right 90.8% and 90.6% of the time. See [Performance](#performance).
 
@@ -66,13 +66,13 @@ points off on average.
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/diagrams/architecture-light.svg">
-  <img width="880" src="docs/diagrams/architecture-light.svg" alt="Serving architecture. In your browser, the React web app (served from client/build on the same origin) and the Chrome extension call FastAPI, which runs as one Render web service; the extension also reads ranks from the LeetCode ranking page JSON. FastAPI checks a per-IP rate limiter of 30 requests a minute, reads a TTL cache (in memory, or Redis when REDIS_URL is set), calls LeetCode GraphQL for histories and contests on a cache miss, and runs a NumPy Dense network on 15 features, loaded at startup from models/weights.npz and scaler.json. A GitHub Actions keep-warm job pings /api/health every 10 minutes on contest days.">
+  <img width="880" src="docs/diagrams/architecture-light.svg" alt="Serving architecture. In your browser, the React web app (served from client/build on the same origin) calls FastAPI, which runs as one Render web service. The Chrome extension does not use the API: it reads ranks from the LeetCode ranking page JSON and contest histories from LeetCode GraphQL on the page's own origin, and runs model.json from the Hugging Face Hub, checked daily. FastAPI checks a per-client rate limiter of 30 requests a minute, reads a TTL cache (in memory, or Redis when REDIS_URL is set), calls LeetCode GraphQL for histories and contests on a cache miss, and runs a NumPy Dense network on 15 features, loaded at startup from models/weights.npz and scaler.json. A GitHub Actions keep-warm job pings /api/health every 10 minutes on contest days.">
 </picture>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/ml-lifecycle-dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/diagrams/ml-lifecycle-light.svg">
-  <img width="880" src="docs/diagrams/ml-lifecycle-light.svg" alt="Data and model lifecycle. A weekly GitHub Actions job runs update_data.py (12,000 users, 95% retention floor) and backtest.py (scores the served model on users outside the training data), both against LeetCode GraphQL, and opens a PR with data/data.json and docs/backtest.md for review. After merge, a manual retrain runs train.py (Keras, split by user, --loss huber), which writes model.keras, then export_model.py turns the Dense layers into NumPy arrays in models/weights.npz and scaler.json. Those artifacts are committed only if they win the backtest, and FastAPI on Render loads them at startup.">
+  <img width="880" src="docs/diagrams/ml-lifecycle-light.svg" alt="Data and model lifecycle. A weekly GitHub Actions job runs update_data.py (12,000 users, 95% retention floor) against LeetCode GraphQL, export_dataset.py publishes the records as Parquet split by user to the Hugging Face dataset repo, and backtest.py opens a PR with docs/backtest.md only. A manual retrain runs train.py on the Hub dataset (Keras, --data hub, --loss huber), which writes model.keras, then export_model.py turns the Dense layers into NumPy arrays in models/ (weights.npz, scaler.json, model.json). Those artifacts are committed only if they win the backtest; FastAPI on Render loads them at startup, and publish_model.py pushes them to the Hub model repo, where the Chrome extension loads model.json daily.">
 </picture>
 
 The specs behind the pictures are [`docs/diagrams/architecture.yaml`](docs/diagrams/architecture.yaml) and [`docs/diagrams/ml-lifecycle.yaml`](docs/diagrams/ml-lifecycle.yaml), rendered with [orrery](https://github.com/Sagargupta16/orrery).
@@ -84,6 +84,10 @@ The specs behind the pictures are [`docs/diagrams/architecture.yaml`](docs/diagr
   blocked for servers; the extension reads it in the browser).
 - Training and serving are split: TensorFlow is only needed offline, and the
   served model is plain NumPy (see [Serving](#serving)).
+- The extension does not call the API. It reads histories from LeetCode GraphQL
+  on the page's own origin and runs `model.json` from the Hugging Face Hub, so
+  it has no cold start and no shared rate limit (see
+  [Browser Extension](#browser-extension)).
 
 ### Design decisions
 
@@ -95,7 +99,8 @@ The specs behind the pictures are [`docs/diagrams/architecture.yaml`](docs/diagr
 | Participant-count features (3, 4, 13) built by the training formula at serve time | Train/serve skew on participant count tripled the backtest error (see [Performance](#performance)) |
 | Train/test split by user, not by record | A random record split puts one user's contests on both sides and flatters the test score |
 | Huber loss instead of MSE | First contests swing 100+ points; Huber keeps those from dominating, and it won both backtests |
-| Extension calls the API from its service worker | Host permissions avoid CORS changes on the API, and one queue shares the 30/min rate limit across tabs |
+| Extension runs the model itself, with `model.json` from the Hub | No Render cold start and no 30/min limit shared by every user; a retrain reaches every install without a store release; a parity test pins the JavaScript to the Python features |
+| Training data on the Hugging Face Hub, not in git | No 100 MB per-file cap and no 65 MB JSON diffs in history; the same 295,899 records are 15 MB as Parquet against 68 MB as JSON |
 | Retention floor on the data refresh | A throttled fetch once opened a PR that halved the training set |
 | Hash-pinned lockfiles (`uv.lock`, `requirements*.lock.txt`) | Docker installs with `--require-hashes` |
 
@@ -120,14 +125,17 @@ scripts/
   backtest.py                    # Score the served model on recent, unseen contests
   package_extension.py           # Zip extension/ for the Chrome Web Store
   update_data.py                 # Fetch training data from LeetCode
+  export_dataset.py              # Records -> Parquet split by user -> Hub dataset repo
+  publish_model.py               # models/ -> model.json + model card -> Hub model repo
+  make_parity_fixture.py         # Python outputs the extension's JS port is tested against
   check.py                       # Smoke test the running API
 notebooks/
   LC_Contest_Rating_Predictor.ipynb  # Original training notebook (random split)
-data/                            # Training data
-models/                          # Exported weights + scaler (served) + metrics.json
+data/                            # usernames.json (the records live on the Hub)
+models/                          # Exported weights + scaler (API), model.json (extension), metrics.json
 docs/                            # backtest.md (refreshed weekly), screenshots, diagrams/ (orrery specs + SVGs)
-extension/                       # Chrome extension (8 tests, no build step)
-tests/                           # 68 backend tests
+extension/                       # Chrome extension (17 tests, no build step)
+tests/                           # 72 backend tests, fixtures/ for the extension parity check
 client/                          # React frontend (19 tests)
 ```
 
@@ -225,13 +233,24 @@ page's own pagination.
   extension adds 1 to match the page. leetcode.cn accounts are skipped, since
   their histories are not on leetcode.com; their rows get an empty cell so the
   columns after Score stay lined up.
-- **Predictions** come from the API's `/api/predict`, one request per row, from
-  the service worker with at most 2 in flight. The API allows 30 a minute per
-  IP, so a second page inside a minute waits out `Retry-After` instead of
-  failing. Answers are cached for the browser session.
-- **API**: the public demo by default. The options page points it at any other
-  server (for example `http://localhost:8000`) and asks for that host's
-  permission only when you save it.
+- **Histories** come from LeetCode GraphQL (`/graphql/`), requested from the
+  ranking page itself, so they are same-origin like the site's own calls. At
+  most 2 are in flight, a 429 waits out `Retry-After`, and each history is
+  cached for an hour in the browser session.
+- **Predictions** run in the browser. `core.js` rebuilds the same 15 features
+  the API does and runs the Dense network from `model.json`; a contest LeetCode
+  already rated is scored from the history before it, and the tooltip shows the
+  change LeetCode applied. `extension/inference.test.js` checks it against
+  outputs of the Python code (`tests/fixtures/extension_parity.json`): the
+  features match exactly and predictions within 1e-5.
+- **Model**: `model.json` from [`Sagargupta1610/leetcode-rating-predictor`](https://huggingface.co/Sagargupta1610/leetcode-rating-predictor)
+  on the Hugging Face Hub, cached and re-checked once a day, so a retrain reaches
+  every install without a store release. A model built for other inputs
+  (`feature_version`) is refused. Clicking the toolbar button shows the model
+  revision and checks for a newer one.
+
+Nothing is sent to the predictor API or anywhere else besides leetcode.com and
+huggingface.co.
 
 Install it unpacked: open `chrome://extensions`, turn on Developer mode, click
 **Load unpacked** and pick the `extension/` folder. To build the store upload:
@@ -240,9 +259,11 @@ Install it unpacked: open `chrome://extensions`, turn on Developer mode, click
 python scripts/package_extension.py   # dist/leetcode-rating-predictor-extension-<version>.zip
 ```
 
-Verified end to end on 2026-10-18 by loading it into Chromium with Playwright on
-the live Weekly Contest 524 ranking (pages 3 and 4) against a local API: 23 of
-23 rows on each page got a prediction, including the 429 waits.
+Verified end to end on 2026-10-24 by loading it into Chromium with Playwright on
+the live Weekly Contest 524 ranking (page 3): 23 of 23 rows got a prediction and
+all 35 GraphQL calls on the page returned 200. For 6 of those users the
+in-browser prediction matched the live API's `/api/predict` within 1.6e-5,
+including two contests LeetCode had already rated.
 
 ## ML Model
 
@@ -273,6 +294,11 @@ The NumPy path agrees with TensorFlow to within 7.6e-06 on the golden input
 (the scaler is exact), which is far below the two decimals the UI renders. A
 golden test in `tests/test_model_artifacts.py` pins the output so a dependency
 bump or re-export cannot silently change predictions.
+
+`scripts/publish_model.py` writes the same network and scaler as one plain JSON
+file, `models/model.json`, which the browser extension runs, and with
+`--upload` publishes `models/`, `model.keras` and a model card to the Hub model
+repo. A test fails if `model.json` drifts from `weights.npz`.
 
 ### 15 Input Features
 
@@ -351,21 +377,26 @@ python scripts/update_data.py --users 14000       # widen the slice
 python scripts/update_data.py --min-retention 0.5 # allow a bigger shrink
 ```
 
-This fetches contest history via GraphQL and writes to `data/data.json`.
+This fetches contest history via GraphQL and writes `data/data.json` locally
+(not committed). `scripts/export_dataset.py` turns it into Parquet, one file per
+split, with the 15 features under their names, the rating change, an anonymous
+user id and the by-user split, and `--upload` pushes it with a dataset card to
+the Hub dataset repo `Sagargupta1610/leetcode-contest-rating-changes`. The weekly
+job does both; it needs an `HF_TOKEN` secret with write access to that repo.
 
 Two guards worth knowing about, both there because the weekly job once opened a
 PR that halved the training set:
 
 - **Retention floor.** A run that keeps less than `--min-retention` (default
-  95%) of the records already committed aborts instead of writing, and exits
-  non-zero. Contest histories only grow and `usernames.json` is fixed, so a much
-  smaller result means the fetch was throttled, not that the data shrank. Pass
-  `--force` when a shrink is genuinely intended.
-- **User cap.** `data/data.json` is committed, so it lives under GitHub's 100 MB
-  per-file hard limit. At roughly 8.3 KB per contributing user, all 43,158
-  usernames would produce about a 307 MB file that cannot be pushed. The default
-  of 12,000 lands near 65 MB. The script prints the written size and warns past
-  90 MB.
+  95%) of the records already published aborts instead of writing, and exits
+  non-zero. CI compares with the Hub dataset (`--baseline hub`); locally the
+  default compares with `data/data.json`. Contest histories only grow and
+  `usernames.json` is fixed, so a much smaller result means the fetch was
+  throttled, not that the data shrank. Pass `--force` when a shrink is
+  genuinely intended.
+- **User cap.** 12,000 users by default (15.3 MB of Parquet). The Hub has no
+  file-size cap, so this is no longer a storage limit, but `scripts/backtest.py`
+  samples its unseen users from the usernames past it.
 
 Failed fetches are reported separately from accounts that genuinely have no
 contest history, so throttling shows up in the summary rather than hiding as
@@ -381,11 +412,14 @@ python scripts/train.py --loss huber   # CPU is enough
 python scripts/export_model.py
 ```
 
-`scripts/train.py` keeps every user on one side of the train/validation/test
-split. `data/data.json` stores no user id, but each user's records are
-contiguous and chain (a record's rating is the previous rating plus its change),
-so a break in the chain is a user boundary. On the current data the 8,182 chain
-breaks match the records that look like a first contest one for one.
+`scripts/train.py` reads the Hub dataset by default and keeps every user on
+one side of the train/validation/test split, using the split stored with the
+data. `--revision training-2026-10-18` is the exact data the served model was
+trained on: the same 242,108 / 26,093 / 27,698 rows as `models/metrics.json`.
+`--data data/data.json` trains from a local fetch instead; older copies of it
+store no user id, so the split falls back to rating-chain breaks (a record's
+rating is the previous rating plus its change), which on the 2026-10-18 data
+match the records that look like a first contest one for one.
 
 The notebook in `notebooks/` is the original exploratory version with a random
 record split; keep it for reference, retrain with the script.
@@ -424,13 +458,17 @@ python main.py
 
 ### Retraining Checklist
 
-- [ ] Run `python scripts/update_data.py` for fresh data
+- [ ] Train on the latest Hub dataset (the weekly job keeps it fresh)
 - [ ] Copy `models/weights.npz` and `models/scaler.json` to `.cache/old/` (the current model)
 - [ ] Run `python scripts/train.py --loss huber` and `python scripts/export_model.py`
 - [ ] Backtest both models on the same users (`--cache`, see
       CONTRIBUTING.md) and keep the new one only if it wins
 - [ ] Update `GOLDEN_PREDICTION` in `tests/test_model_artifacts.py`
+- [ ] Run `python scripts/publish_model.py` (rewrites `models/model.json`) and
+      `python scripts/make_parity_fixture.py` (the extension's test outputs)
 - [ ] Commit the artifacts with `models/metrics.json`, restart the API
+- [ ] Publish with `python scripts/publish_model.py --upload`; the extension
+      picks it up within a day
 - [ ] Test a prediction via the UI or `python scripts/check.py`
 
 ### Troubleshooting
@@ -468,15 +506,16 @@ npm start    # Dev server on port 3000
 ### Testing
 
 ```bash
-# Backend (68 tests)
+# Backend (72 tests)
 python -m pytest tests/
 
 # Frontend (19 tests)
 cd client
 npm test
 
-# Extension helpers (8 tests)
-node --test extension/core.test.js
+# Extension (17 tests, including the parity check against the Python model)
+cd extension
+node --test
 ```
 
 ### Backtest
@@ -551,9 +590,10 @@ GitHub Actions:
   pytest; `node` job runs `npm ci`, Vitest, `vite build` and the extension tests. Black and isort run
   through pre-commit locally.
 - **CodeQL** (GitHub default setup): on push and weekly.
-- **Refresh training data**: weekly cron runs `scripts/update_data.py`, then
-  `scripts/backtest.py` to regenerate `docs/backtest.md`, and opens a PR with
-  both.
+- **Refresh training data**: weekly cron runs `scripts/update_data.py`,
+  publishes the records to the Hub dataset with `scripts/export_dataset.py`,
+  then runs `scripts/backtest.py` and opens a PR with the new
+  `docs/backtest.md`.
 - **Keep demo warm on contest days**: pings `/api/health` every 10 minutes on
   Sunday 02:00-07:59 UTC (weekly contest at 02:30) and Saturday 14:00-19:59 UTC
   (biweekly at 14:30). That is 12 hours a week, about 52 of the 750 free
