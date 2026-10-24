@@ -114,7 +114,7 @@ def dumps_fixture(fixture: dict) -> str:
 
 def main() -> int:
     FIXTURE.parent.mkdir(parents=True, exist_ok=True)
-    FIXTURE.write_text(dumps_fixture(build_fixture()), encoding="utf-8")
+    FIXTURE.write_text(dumps_fixture(build_fixture()), encoding="utf-8", newline="\n")
     print(f"wrote {FIXTURE.relative_to(REPO_ROOT)}")
     return 0
 

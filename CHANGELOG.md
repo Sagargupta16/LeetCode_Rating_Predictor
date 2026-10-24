@@ -1,5 +1,61 @@
 # Changelog
 
+## [2.6.0] - 2026-10-24
+
+### Added
+
+- **The browser extension runs the model itself.** It no longer calls the
+  predictor API: it reads each listed user's contest history from LeetCode
+  GraphQL on the ranking page's own origin, rebuilds the 15 features in
+  `extension/core.js` and runs the network from `model.json`, which it loads
+  from the Hugging Face Hub, caches and re-checks daily. No Render cold start,
+  no 30-requests-a-minute limit shared by every user, and a retrain reaches
+  every install without a store release. A contest LeetCode already rated is
+  scored from the history before it, and the tooltip shows the change LeetCode
+  applied. The options page now shows the model revision and checks for a newer
+  one. Checked on the live Weekly Contest 524 ranking (page 3): 23 of 23 rows
+  predicted, and for 6 of them the in-browser result matched the live API
+  within 1.6e-5, including two already-rated contests.
+- **`models/model.json`** (159 KB): the served network and scaler in one JSON
+  file, written by `scripts/publish_model.py` from `weights.npz` and
+  `scaler.json`. A test fails if it drifts from them; its float64 forward pass
+  matches the API's float32 one within 8e-6.
+- **Model repo on the Hub**, `sagargupta16/leetcode-rating-predictor`:
+  `scripts/publish_model.py --upload` pushes `models/`, `model.keras`,
+  `docs/backtest.md` and a model card whose numbers are read from
+  `models/metrics.json` and the backtest.
+- **Dataset repo on the Hub**, `sagargupta16/leetcode-contest-rating-changes`
+  (created private): `scripts/export_dataset.py` writes the records as Parquet,
+  one file per split, with the 15 features under their names, the rating change,
+  an anonymous user id and the by-user split. The 2026-10-18 training data comes
+  to the same 242,108 / 26,093 / 27,698 rows as `models/metrics.json`, and
+  `train.py` reads identical rows from it as from the JSON. The 295,899 records
+  are 15.3 MB as Parquet against 68.5 MB as JSON.
+- `extension/inference.test.js` checks the JavaScript port against
+  `tests/fixtures/extension_parity.json`, which `scripts/make_parity_fixture.py`
+  generates from the Python feature code; features match exactly. CI now runs
+  every extension test (`node --test`).
+
+### Changed
+
+- `data/data.json` is no longer committed. The weekly refresh publishes the
+  records to the Hub dataset instead of opening a 65 MB PR, compares the
+  retention floor with the published row count (`--baseline hub`), and only
+  opens a PR for `docs/backtest.md`. It needs an `HF_TOKEN` secret with write
+  access to the dataset repo.
+- `scripts/train.py` reads the Hub dataset by default (`--data hub`,
+  `--revision`), using the split stored with it; `--data data/data.json` still
+  trains from a local fetch.
+- `scripts/update_data.py` records an anonymous user id, the contest title and
+  its start time with every row.
+- `scripts/backtest.py` and the API share `replay_features` and the new
+  `FEATURE_NAMES` in `app/services/features.py`.
+- `huggingface-hub` 2.3.0 and `pyarrow` 26.0.0 join the dev group and the `ml`
+  extra; the runtime dependencies are unchanged.
+- Both README diagrams are redrawn for the Hub flows (orrery review 99.6 and
+  97.3).
+- Version 2.6.0 for the API, client and extension.
+
 ## [2.5.0] - 2026-10-24
 
 ### Fixed

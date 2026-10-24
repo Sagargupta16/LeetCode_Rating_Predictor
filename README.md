@@ -259,9 +259,11 @@ Install it unpacked: open `chrome://extensions`, turn on Developer mode, click
 python scripts/package_extension.py   # dist/leetcode-rating-predictor-extension-<version>.zip
 ```
 
-Verified end to end on 2026-10-18 by loading it into Chromium with Playwright on
-the live Weekly Contest 524 ranking (pages 3 and 4) against a local API: 23 of
-23 rows on each page got a prediction, including the 429 waits.
+Verified end to end on 2026-10-24 by loading it into Chromium with Playwright on
+the live Weekly Contest 524 ranking (page 3): 23 of 23 rows got a prediction and
+all 35 GraphQL calls on the page returned 200. For 6 of those users the
+in-browser prediction matched the live API's `/api/predict` within 1.6e-5,
+including two contests LeetCode had already rated.
 
 ## ML Model
 

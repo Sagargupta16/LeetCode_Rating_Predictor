@@ -270,7 +270,10 @@ def main() -> int:
     parser.add_argument("--upload", action="store_true", help="push to the Hub")
     args = parser.parse_args()
 
-    MODEL_JSON.write_text(dumps_model_json(build_model_json()), encoding="utf-8")
+    # newline="\n" so the file uploaded to the Hub is LF on Windows too.
+    MODEL_JSON.write_text(
+        dumps_model_json(build_model_json()), encoding="utf-8", newline="\n"
+    )
     print(f"wrote {MODEL_JSON.relative_to(REPO_ROOT)}")
     if args.upload:
         upload()
