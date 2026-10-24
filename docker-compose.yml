@@ -8,8 +8,13 @@ services:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
+    # Only the backend sources and artifacts, so edits show up on restart while
+    # the image keeps the client/build it compiled (a whole-repo mount hid it,
+    # since client/build is gitignored on the host).
     volumes:
-      - ./:/app:cached
+      - ./main.py:/app/main.py:ro
+      - ./app:/app/app:ro
+      - ./models:/app/models:ro
     restart: unless-stopped
 
   redis:

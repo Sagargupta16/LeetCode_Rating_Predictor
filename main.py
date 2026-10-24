@@ -23,7 +23,7 @@ from app.config import (
 )
 from app.model_loader import load_model, load_scaler
 from app.schemas import AttendedContest, PredictionInput, PredictionOutput
-from app.services.features import build_features
+from app.services.features import build_features, rated_positions, replay_features
 from app.services.leetcode import (
     fetch_attended_contests,
     fetch_contest_data,
@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LeetCode Rating Predictor API",
     description="Predict LeetCode contest rating changes using ML",
-    version="2.4.0",
+    version="2.5.0",
     lifespan=lifespan,
 )
 
@@ -192,13 +192,24 @@ async def predict(input_data: PredictionInput, request: Request):
                 status_code=400, detail="Incomplete user data from LeetCode"
             )
 
+        # Contests LeetCode already rated are part of current_rating, so they
+        # are scored from the history before them and do not move the chain.
+        history = user_data.get("history") or []
+        rated = rated_positions(history)
+
+        # Fetched concurrently; the semaphore still caps upstream calls.
+        names = list(dict.fromkeys(c.name for c in input_data.contests))
+        details = await asyncio.gather(
+            *(fetch_contest_data(async_client, semaphore, cache, n) for n in names)
+        )
+        registered = {
+            n: d.get("user_num", 0) for n, d in zip(names, details, strict=True)
+        }
+
         results = []
 
         for contest in input_data.contests:
-            contest_data = await fetch_contest_data(
-                async_client, semaphore, cache, contest.name
-            )
-            total_participants = contest_data.get("user_num", 0)
+            total_participants = registered[contest.name]
 
             # registerUserNum from GraphQL is a pre-registration count, not
             # actual participants. Use a sensible fallback for display when
@@ -208,6 +219,26 @@ async def predict(input_data: PredictionInput, request: Request):
 
             if contest.rank > total_participants:
                 total_participants = int(contest.rank * 1.5)
+
+            index = rated.get(contest.name)
+            if index is not None:
+                features, rating_before = replay_features(history, index, contest.rank)
+                rating_change = make_prediction(model, scaler, features)
+                results.append(
+                    PredictionOutput(
+                        contest_name=contest.name,
+                        prediction=rating_change,
+                        rating_before_contest=rating_before,
+                        rank=contest.rank,
+                        total_participants=total_participants,
+                        rating_after_contest=rating_before + rating_change,
+                        attended_contests_count=sum(
+                            1 for h in history[:index] if h.get("attended")
+                        ),
+                        actual_change=history[index]["rating"] - rating_before,
+                    )
+                )
+                continue
 
             # The model's participant features use the training formula
             # (see model_participants); the registered count above is display
@@ -246,10 +277,14 @@ async def predict(input_data: PredictionInput, request: Request):
 
 @app.get(
     "/api/contestData",
-    responses={500: {"description": "Failed to get contest data"}},
+    responses={
+        429: {"description": "Rate limit exceeded"},
+        500: {"description": "Failed to get contest data"},
+    },
 )
-async def get_contest_data():
-    """Get latest contest information."""
+async def get_contest_data(request: Request):
+    """The two most recent finished contests and the next two, oldest first."""
+    rate_limiter.check(client_key(request))
     try:
         contest_slugs = await find_latest_contests(async_client, cache)
         return {"contests": contest_slugs}

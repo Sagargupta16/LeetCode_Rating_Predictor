@@ -4,8 +4,10 @@ services:
     runtime: python
     # No ML framework is installed: inference runs on numpy against the
     # exported artifacts in models/. See scripts/export_model.py.
+    # Installs the hash-pinned lock, like the Dockerfile, so the deploy gets
+    # exactly the dependency tree CI tested instead of a fresh resolve.
     buildCommand: >
-      pip install -r requirements.txt &&
+      pip install --require-hashes -r requirements.lock.txt &&
       cd client && npm ci --ignore-scripts && npm run build
     startCommand: uvicorn main:app --host 0.0.0.0 --port 8000
     envVars:

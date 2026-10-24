@@ -3,9 +3,9 @@
 import re
 from typing import List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-from app.config import CONTEST_NAME_RE
+from app.config import CONTEST_NAME_RE, MAX_CONTESTS_PER_REQUEST
 
 
 class Contest(BaseModel):
@@ -33,7 +33,7 @@ class Contest(BaseModel):
 
 class PredictionInput(BaseModel):
     username: str
-    contests: List[Contest]
+    contests: List[Contest] = Field(max_length=MAX_CONTESTS_PER_REQUEST)
 
     @field_validator("username")
     @classmethod
@@ -63,3 +63,6 @@ class PredictionOutput(BaseModel):
     total_participants: int
     rating_after_contest: float
     attended_contests_count: int
+    # Set when LeetCode already rated the contest: the change it applied, to
+    # compare with the prediction. None for a contest still to be rated.
+    actual_change: Optional[float] = None

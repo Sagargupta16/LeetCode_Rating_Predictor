@@ -111,7 +111,8 @@
 .input {
   width: 100%;
   padding: 0.75rem 1rem;
-  font-size: 0.95rem;
+  /* 16px: iOS Safari zooms the page into any field smaller than that. */
+  font-size: 1rem;
   font-family: inherit;
   color: #e2e2f0;
   background: #323244;
@@ -202,7 +203,7 @@
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s;
   background: transparent;
 }
 
@@ -445,21 +446,6 @@
 .checkbox:focus-visible {
   outline: 2px solid #ffc978;
   outline-offset: 2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
-  .contest-card:hover,
-  .btn:hover:not(:disabled) {
-    transform: none;
-  }
 }
 
 /* ── Responsive ── */

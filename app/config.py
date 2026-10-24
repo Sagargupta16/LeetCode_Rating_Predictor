@@ -41,6 +41,21 @@ MAX_RATING_CHANGE = float(os.environ.get("MAX_RATING_CHANGE", "500"))
 RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "30"))
 RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))
 
+# Header a trusted proxy overwrites with the caller's IP. The default fits the
+# Render deploy, which sits behind Cloudflare; requests without the header
+# fall back to the socket peer. Set it to an empty value when nothing in front
+# of the app overwrites the header, or a caller could pick their own key.
+# Never X-Forwarded-For: proxies append to it, so its first entry is whatever
+# the caller sent.
+CLIENT_IP_HEADER = (
+    os.environ.get("CLIENT_IP_HEADER", "cf-connecting-ip").strip().lower()
+)
+
+# One /api/predict request costs a LeetCode call per contest but a single
+# rate-limit hit, so the list is capped. The form shows four listed contests
+# plus at most ten auto-filled ones.
+MAX_CONTESTS_PER_REQUEST = 20
+
 # Server
 API_HOST = os.environ.get("API_HOST", "0.0.0.0")
 API_PORT = int(os.environ.get("API_PORT", "8000"))

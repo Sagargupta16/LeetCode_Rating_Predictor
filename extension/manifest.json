@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetCode Rating Predictor",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Shows a predicted rating change next to every name on LeetCode contest ranking pages.",
   "homepage_url": "https://github.com/Sagargupta16/LeetCode_Rating_Predictor",
   "icons": {

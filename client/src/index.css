@@ -13,5 +13,5 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: #0f0f1a;
   color: #e2e2f0;
-  min-height: 100vh;
+  min-height: 100dvh;
 }

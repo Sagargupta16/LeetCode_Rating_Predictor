@@ -1,17 +1,15 @@
 [project]
 name = "leetcode-rating-predictor"
-version = "2.4.2"
-description = "Neural network LeetCode contest rating predictor (FastAPI + TensorFlow)"
+version = "2.5.0"
+description = "Neural network LeetCode contest rating predictor (FastAPI + NumPy inference)"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
     "fastapi==0.142.2",
     "pydantic==2.13.5",
     "numpy==2.5.3",
-    "requests==2.34.2",
     "uvicorn[standard]==0.54.0",
     "httpx==0.28.1",
-    "tqdm==4.70.1",
     "redis==8.1.0",
 ]
 
@@ -31,15 +29,18 @@ ml = [
 ]
 
 # Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
-# can provision lint and test tooling straight from uv.lock.
+# can provision lint and test tooling straight from uv.lock. requests and tqdm
+# are only imported by scripts/ (data refresh, backtest), never by the API.
 [dependency-groups]
 dev = [
-    "black==26.5.1",
+    "black==26.10.1",
     "ruff==0.16.10",
     "isort==8.0.1",
     "pre-commit==4.6.2",
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
+    "requests==2.34.2",
+    "tqdm==4.70.1",
 ]
 
 [build-system]
@@ -56,6 +57,7 @@ include = ["app*"]
 
 [tool.black]
 line-length = 88
+target-version = ["py312"]
 
 [tool.isort]
 profile = "black"

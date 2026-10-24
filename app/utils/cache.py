@@ -17,6 +17,7 @@ class TTLCache:
             raise ValueError("TTL must be a positive integer")
         self.ttl = ttl_seconds
         self._store: dict[str, tuple[Any, float]] = {}
+        self._next_sweep = 0.0
 
     def get(self, key: str) -> Optional[Any]:
         entry = self._store.get(key)
@@ -29,7 +30,13 @@ class TTLCache:
         return None
 
     def set(self, key: str, value: Any):
-        self._store[key] = (value, time.time() + self.ttl)
+        now = time.time()
+        # get() only evicts the key it reads, so entries for usernames nobody
+        # asks about again would stay forever. Sweep once per TTL.
+        if now >= self._next_sweep:
+            self.cleanup()
+            self._next_sweep = now + self.ttl
+        self._store[key] = (value, now + self.ttl)
 
     def cleanup(self):
         """Remove all expired entries."""

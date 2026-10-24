@@ -119,7 +119,6 @@ scripts/
   export_model.py                # model.keras/scaler.save -> models/*.npz|json
   backtest.py                    # Score the served model on recent, unseen contests
   package_extension.py           # Zip extension/ for the Chrome Web Store
-  download_model.py              # Download model artifacts from URLs
   update_data.py                 # Fetch training data from LeetCode
   check.py                       # Smoke test the running API
 notebooks/
@@ -156,10 +155,18 @@ client/                          # React frontend (19 tests)
     "rank": 1500,
     "total_participants": 42002,
     "rating_after_contest": 1825.5,
-    "attended_contests_count": 45
+    "attended_contests_count": 45,
+    "actual_change": null
   }
 ]
 ```
+
+Contests are scored in order, each one starting from the rating the previous
+one predicts. A contest LeetCode has already rated is the exception: its
+change is already in the current rating, so it is scored from the history as
+it stood before that contest (the same replay `scripts/backtest.py` uses),
+does not move the chain, and `actual_change` carries the change LeetCode
+applied. A request takes at most 20 contests.
 
 Accounts that exist but have no rated contest yet are predicted from a 1500
 rating and an empty history, which is how the training data starts every user.
@@ -187,7 +194,9 @@ so results can be posted straight back to `/api/predict`.
 
 ### `GET /api/contestData`
 
-Returns the latest contests (via GraphQL `topTwoContests`).
+Returns the two most recent finished contests (GraphQL `pastContests`) and the
+next two (`topTwoContests`), oldest first, so the form offers the contest that
+just ended as well as the upcoming ones.
 
 ### `GET /api/health`
 
@@ -195,9 +204,13 @@ Health check with model/scaler/client status.
 
 ### Rate limiting
 
-`/api/predict` and `/api/userContests/{username}` allow 30 requests per minute
-per client IP by default (`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), and
-return `429` with a `Retry-After` header once exceeded.
+`/api/predict`, `/api/userContests/{username}` and `/api/contestData` share a
+budget of 30 requests per minute per client IP by default
+(`RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW`), and return `429` with a
+`Retry-After` header once exceeded. The client IP comes from
+`CLIENT_IP_HEADER` (Cloudflare's `CF-Connecting-IP` by default, which fronts
+Render), else the socket peer; `X-Forwarded-For` is ignored because callers
+can set its first entry to anything.
 
 ## Browser Extension
 
@@ -505,6 +518,7 @@ pre-commit run --all-files
 | `CACHE_TTL` | `300` | Cache TTL in seconds |
 | `RATE_LIMIT_REQUESTS` | `30` | Requests per window per client IP |
 | `RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
+| `CLIENT_IP_HEADER` | `cf-connecting-ip` | Header a trusted proxy overwrites with the caller's IP; set it empty when no such proxy is in front |
 | `MAX_RATING_CHANGE` | `500` | Predictions beyond +/- this fail with 500 |
 | `LEETCODE_GRAPHQL_URL` | `https://leetcode.com/graphql` | LeetCode GraphQL endpoint |
 | `VITE_API_BASE_URL` | *(same origin; `:8000` on the Vite dev server)* | Frontend API endpoint |
@@ -527,18 +541,6 @@ docker run -p 8000:8000 leetcode-predictor
 ```bash
 cd client && npm run build && cd ..
 uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Model Artifacts
-
-Download from a release or URL:
-```bash
-MODEL_URL=https://... SCALER_URL=https://... python scripts/download_model.py
-```
-
-GitHub release shorthand:
-```bash
-MODEL_URL=gh:owner/repo/releases/tag/v1/model.keras python scripts/download_model.py
 ```
 
 ## CI Pipeline

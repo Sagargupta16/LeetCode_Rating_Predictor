@@ -58,6 +58,36 @@ def summarize_history(history: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def rated_positions(history: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Contest slug -> index in ``history`` for contests LeetCode already rated.
+
+    The current rating already includes these, so a prediction for one has to
+    start from the history as it stood before it (:func:`replay_features`)
+    rather than from the current rating.
+    """
+    positions = {}
+    for i, h in enumerate(history):
+        slug = (h.get("contest") or {}).get("titleSlug")
+        if slug and h.get("attended") and h.get("ranking") and h.get("rating"):
+            positions[slug] = i
+    return positions
+
+
+def replay_features(
+    history: List[Dict[str, Any]], index: int, rank: int
+) -> tuple[np.ndarray, float]:
+    """Features for the contest at ``history[index]`` and the rating before it.
+
+    Rebuilds the user's inputs from the contests before ``index`` only, the
+    same state the model would have seen had it predicted the contest live.
+    """
+    before = history[:index]
+    prior = [h for h in before if h.get("attended") and h.get("rating")]
+    rating = prior[-1]["rating"] if prior else DEFAULT_RATING
+    user = summarize_history(before)
+    return build_features(user, rating, rank, user["contestIndex"]), rating
+
+
 def model_participants(rank: int) -> int:
     """Participant count in the form the training data uses.
 
