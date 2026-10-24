@@ -1,18 +1,43 @@
 // Runs on leetcode.com contest ranking pages. Reads the page's own ranking
-// JSON for the visible page, then puts a predicted rating change next to each
-// name. The ranking page is a single-page app, so it re-checks on DOM changes
-// and URL changes instead of only on load.
+// JSON for the visible page, reads each listed user's contest history from
+// LeetCode's GraphQL endpoint (same origin, like the site itself does), and
+// runs the model in the browser to put a predicted rating change next to each
+// name. Nothing is sent anywhere but leetcode.com; the model comes from the
+// service worker. The ranking page is a single-page app, so it re-checks on
+// DOM changes and URL changes instead of only on load.
 (function () {
   "use strict";
 
-  const { parseRankingPath, rankingApiPath, ranksFromRanking, slugFromHref, formatDelta } =
-    self.LRP;
+  const {
+    HISTORY_QUERY,
+    parseRankingPath,
+    rankingApiPath,
+    ranksFromRanking,
+    slugFromHref,
+    formatDelta,
+    predictionKey,
+    retryAfterSeconds,
+    parseHistoryPayload,
+    predictContest,
+  } = self.LRP;
 
   const BADGE_ATTR = "data-lrp-key";
+  const HISTORY_TTL_MS = 60 * 60 * 1000;
+  const MAX_CONCURRENT_HISTORY = 2;
+  const MAX_HISTORY_ATTEMPTS = 4;
+
   const rankingCache = new Map(); // "contest:page" -> Promise<Map<slug, rank>>
-  const stats = { done: 0, total: 0, waking: false, failed: 0, missing: 0 };
+  const historyCache = new Map(); // username -> Promise<{history, currentRating}>
+  const stats = { done: 0, total: 0, failed: 0 };
   let pill;
   let scheduled = false;
+  let modelPromise = null;
+
+  const ERROR_TITLES = {
+    "model-unavailable": "Could not load the model from Hugging Face, reload to retry",
+    "history-unavailable": "Could not read this user's contest history from LeetCode, reload to retry",
+    invalid: "The model gave an implausible result for this user",
+  };
 
   function loadRanks(contest, page) {
     const key = `${contest}:${page}`;
@@ -28,6 +53,158 @@
     }
     return rankingCache.get(key);
   }
+
+  // --- Model (from the service worker) ------------------------------------
+
+  function askServiceWorker(message, attempt = 1) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(message, (result) => {
+        if (chrome.runtime.lastError || !result) {
+          // The service worker can be restarted mid-request; ask once more.
+          if (attempt < 2) {
+            setTimeout(() => askServiceWorker(message, attempt + 1).then(resolve), 1000);
+          } else {
+            resolve({ error: "model-unavailable" });
+          }
+          return;
+        }
+        resolve(result);
+      });
+    });
+  }
+
+  function loadModel() {
+    modelPromise ??= askServiceWorker({ type: "model" }).then((result) => {
+      if (result.error || !result.model) {
+        modelPromise = null; // let the next pass try again
+        throw new Error("model-unavailable");
+      }
+      return result.model;
+    });
+    return modelPromise;
+  }
+
+  // --- Histories (from leetcode.com/graphql) ------------------------------
+
+  const queue = [];
+  let active = 0;
+  let pausedUntil = 0; // shared by every request once LeetCode says 429
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  function csrfToken() {
+    const match = /(?:^|;\s*)csrftoken=([^;]+)/.exec(document.cookie);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  async function fetchHistory(username) {
+    const headers = { "Content-Type": "application/json" };
+    const csrf = csrfToken();
+    if (csrf) headers["x-csrftoken"] = csrf;
+    const body = JSON.stringify({ query: HISTORY_QUERY, variables: { username } });
+
+    for (let attempt = 1; attempt <= MAX_HISTORY_ATTEMPTS; attempt++) {
+      const wait = pausedUntil - Date.now();
+      if (wait > 0) await sleep(wait);
+
+      let response = null;
+      try {
+        response = await fetch("/graphql/", {
+          method: "POST",
+          credentials: "include",
+          headers,
+          body,
+        });
+      } catch {
+        await sleep(2000 * attempt); // network blip
+        continue;
+      }
+      if (response.ok) {
+        const parsed = parseHistoryPayload(await response.json());
+        if (parsed) return parsed;
+        throw new Error("history-unavailable");
+      }
+      if (response.status !== 429 && response.status < 500) break;
+      const seconds = retryAfterSeconds(response.headers.get("Retry-After"));
+      pausedUntil = Math.max(pausedUntil, Date.now() + seconds * 1000);
+    }
+    throw new Error("history-unavailable");
+  }
+
+  function pump() {
+    while (active < MAX_CONCURRENT_HISTORY && queue.length) {
+      const { username, resolve, reject } = queue.shift();
+      active += 1;
+      fetchHistory(username)
+        .then(resolve, reject)
+        .finally(() => {
+          active -= 1;
+          pump();
+        });
+    }
+  }
+
+  // Session storage is a cache only: if it is unreachable (the service worker
+  // has not granted access yet), fall through to a fetch.
+  async function readSession(key) {
+    try {
+      return (await chrome.storage.session.get(key))[key];
+    } catch {
+      return undefined;
+    }
+  }
+
+  async function cachedHistory(username) {
+    const key = `h:${username}`;
+    const entry = await readSession(key);
+    if (entry && Date.now() - entry.fetchedAt < HISTORY_TTL_MS) return entry.record;
+    const record = await new Promise((resolve, reject) => {
+      queue.push({ username, resolve, reject });
+      pump();
+    });
+    // A failed write only costs a refetch later, so it is ignored.
+    try {
+      await chrome.storage.session.set({ [key]: { record, fetchedAt: Date.now() } });
+    } catch {
+      // not cached
+    }
+    return record;
+  }
+
+  function loadHistory(username) {
+    if (!historyCache.has(username)) {
+      historyCache.set(
+        username,
+        cachedHistory(username).catch((error) => {
+          historyCache.delete(username); // retry on the next pass
+          throw error;
+        }),
+      );
+    }
+    return historyCache.get(username);
+  }
+
+  async function predict(contest, username, rank) {
+    let model;
+    try {
+      model = await loadModel();
+    } catch {
+      return { error: "model-unavailable" };
+    }
+    let record;
+    try {
+      record = await loadHistory(username);
+    } catch {
+      return { error: "history-unavailable" };
+    }
+    try {
+      return predictContest(model, { ...record, contest, rank });
+    } catch {
+      return { error: "invalid" };
+    }
+  }
+
+  // --- Page ---------------------------------------------------------------
 
   function ensurePill() {
     if (pill?.isConnected) return pill;
@@ -46,31 +223,9 @@
     }
     el.hidden = false;
     let text = `Rating predictor: ${stats.done}/${stats.total}`;
-    if (stats.waking && stats.done === 0) text += " (waking the API, up to a minute)";
-    if (stats.missing) text += `, ${stats.missing} without rated history`;
     if (stats.failed) text += `, ${stats.failed} unavailable`;
     el.textContent = text;
-    el.classList.toggle(
-      "lrp-pill--done",
-      stats.done + stats.missing + stats.failed >= stats.total,
-    );
-  }
-
-  function sendPredict(job, attempt = 1) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ type: "predict", ...job }, (result) => {
-        if (chrome.runtime.lastError || !result) {
-          // The service worker can be restarted mid-request; ask once more.
-          if (attempt < 2) {
-            setTimeout(() => sendPredict(job, attempt + 1).then(resolve), 2000);
-          } else {
-            resolve({ error: "unavailable" });
-          }
-          return;
-        }
-        resolve(result);
-      });
-    });
+    el.classList.toggle("lrp-pill--done", stats.done + stats.failed >= stats.total);
   }
 
   function showResult(badge, result, rank) {
@@ -78,17 +233,18 @@
     if (result.error) {
       badge.textContent = "n/a";
       badge.classList.add("lrp-badge--na");
-      badge.title =
-        result.error === "no-history"
-          ? "No rated contest history on leetcode.com"
-          : "Predictor API unavailable, reload to retry";
+      badge.title = ERROR_TITLES[result.error] || ERROR_TITLES.invalid;
       return;
     }
     badge.textContent = formatDelta(result.delta);
     badge.classList.add(result.delta >= 0 ? "lrp-badge--up" : "lrp-badge--down");
-    badge.title =
+    let title =
       `Predicted rating change at rank ${rank}: ` +
       `${result.before.toFixed(1)} -> ${result.after.toFixed(1)}`;
+    if (result.actual !== null) {
+      title += `. Already rated: LeetCode applied ${formatDelta(result.actual)}`;
+    }
+    badge.title = title;
   }
 
   // LeetCode renders the ranking as rows of flex cells (name, score, finish
@@ -161,7 +317,7 @@
         existingBadge(link)?.remove();
         continue;
       }
-      const key = `${route.contest}:${slug}:${rank}`;
+      const key = predictionKey(route.contest, slug, rank);
       const existing = existingBadge(link);
       if (existing?.getAttribute(BADGE_ATTR) === key) continue;
       if (existing) existing.remove();
@@ -174,18 +330,12 @@
       placeBadge(link, badge);
 
       stats.total += 1;
-      const waking = setTimeout(() => {
-        stats.waking = true;
-        renderPill();
-      }, 5000);
       renderPill();
-      void sendPredict({ contest: route.contest, username: slug, rank }).then((result) => {
-        clearTimeout(waking);
+      void predict(route.contest, slug, rank).then((result) => {
         if (!badge.isConnected) return;
         showResult(badge, result, rank);
-        if (!result.error) stats.done += 1;
-        else if (result.error === "no-history") stats.missing += 1;
-        else stats.failed += 1;
+        if (result.error) stats.failed += 1;
+        else stats.done += 1;
         renderPill();
       });
     }
@@ -201,7 +351,7 @@
   new MutationObserver(() => {
     if (location.pathname !== lastPath) {
       lastPath = location.pathname;
-      Object.assign(stats, { done: 0, total: 0, waking: false, failed: 0, missing: 0 });
+      Object.assign(stats, { done: 0, total: 0, failed: 0 });
       renderPill();
     }
     schedule();

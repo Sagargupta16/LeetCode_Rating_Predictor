@@ -1,0 +1,495 @@
+{
+  "model": "models/model.json",
+  "cases": [
+    {
+      "name": "contest not rated yet",
+      "history": [
+        {
+          "attended": true,
+          "rating": 1521.4,
+          "ranking": 3100,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4100,
+          "contest": {
+            "titleSlug": "weekly-contest-500"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 2400,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3650,
+          "contest": {
+            "titleSlug": "biweekly-contest-150"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 0,
+          "problemsSolved": 0,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "weekly-contest-501"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1612.2,
+          "ranking": 1500,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2900,
+          "contest": {
+            "titleSlug": "weekly-contest-502"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1590.7,
+          "ranking": 5200,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "biweekly-contest-151"
+          }
+        },
+        {
+          "attended": false,
+          "rating": 1590.7,
+          "ranking": 4000,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2500,
+          "contest": {
+            "titleSlug": "weekly-contest-503"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1633.0,
+          "ranking": 1900,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3300,
+          "contest": {
+            "titleSlug": "weekly-contest-504"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1702.5,
+          "ranking": 700,
+          "problemsSolved": 4,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2100,
+          "contest": {
+            "titleSlug": "weekly-contest-505"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1688.1,
+          "ranking": 2600,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4800,
+          "contest": {
+            "titleSlug": "biweekly-contest-152"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1655.3,
+          "ranking": 4400,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 5100,
+          "contest": {
+            "titleSlug": "weekly-contest-506"
+          }
+        }
+      ],
+      "current_rating": 1655.3,
+      "contest": "weekly-contest-530",
+      "rank": 1200,
+      "expected": {
+        "features": [
+          1655.3,
+          1200.0,
+          10000.0,
+          12.0,
+          10.0,
+          0.625,
+          3707.1428571428573,
+          0.6,
+          3825.0,
+          8.619999999999981,
+          1702.5,
+          7.0909098220799835,
+          198.636,
+          1034.5625,
+          0.6865079365079365
+        ],
+        "rating_before": 1655.3,
+        "prediction": 32.185462951660156,
+        "actual_change": null
+      }
+    },
+    {
+      "name": "rated contest replayed",
+      "history": [
+        {
+          "attended": true,
+          "rating": 1521.4,
+          "ranking": 3100,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4100,
+          "contest": {
+            "titleSlug": "weekly-contest-500"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 2400,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3650,
+          "contest": {
+            "titleSlug": "biweekly-contest-150"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 0,
+          "problemsSolved": 0,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "weekly-contest-501"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1612.2,
+          "ranking": 1500,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2900,
+          "contest": {
+            "titleSlug": "weekly-contest-502"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1590.7,
+          "ranking": 5200,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "biweekly-contest-151"
+          }
+        },
+        {
+          "attended": false,
+          "rating": 1590.7,
+          "ranking": 4000,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2500,
+          "contest": {
+            "titleSlug": "weekly-contest-503"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1633.0,
+          "ranking": 1900,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3300,
+          "contest": {
+            "titleSlug": "weekly-contest-504"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1702.5,
+          "ranking": 700,
+          "problemsSolved": 4,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2100,
+          "contest": {
+            "titleSlug": "weekly-contest-505"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1688.1,
+          "ranking": 2600,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4800,
+          "contest": {
+            "titleSlug": "biweekly-contest-152"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1655.3,
+          "ranking": 4400,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 5100,
+          "contest": {
+            "titleSlug": "weekly-contest-506"
+          }
+        }
+      ],
+      "current_rating": 1655.3,
+      "contest": "weekly-contest-505",
+      "rank": 700,
+      "expected": {
+        "features": [
+          1633.0,
+          700.0,
+          10000.0,
+          7.0,
+          7.0,
+          0.6,
+          3487.5,
+          0.6,
+          3487.5,
+          27.899999999999977,
+          1633.0,
+          6.55250788703459,
+          114.31,
+          979.8,
+          0.6458333333333334
+        ],
+        "rating_before": 1633.0,
+        "prediction": 46.455135345458984,
+        "actual_change": 69.5
+      }
+    },
+    {
+      "name": "rated first contest",
+      "history": [
+        {
+          "attended": true,
+          "rating": 1521.4,
+          "ranking": 3100,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4100,
+          "contest": {
+            "titleSlug": "weekly-contest-500"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 2400,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3650,
+          "contest": {
+            "titleSlug": "biweekly-contest-150"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1563.9,
+          "ranking": 0,
+          "problemsSolved": 0,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "weekly-contest-501"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1612.2,
+          "ranking": 1500,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2900,
+          "contest": {
+            "titleSlug": "weekly-contest-502"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1590.7,
+          "ranking": 5200,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "biweekly-contest-151"
+          }
+        },
+        {
+          "attended": false,
+          "rating": 1590.7,
+          "ranking": 4000,
+          "problemsSolved": 1,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2500,
+          "contest": {
+            "titleSlug": "weekly-contest-503"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1633.0,
+          "ranking": 1900,
+          "problemsSolved": 3,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 3300,
+          "contest": {
+            "titleSlug": "weekly-contest-504"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1702.5,
+          "ranking": 700,
+          "problemsSolved": 4,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 2100,
+          "contest": {
+            "titleSlug": "weekly-contest-505"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1688.1,
+          "ranking": 2600,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 4800,
+          "contest": {
+            "titleSlug": "biweekly-contest-152"
+          }
+        },
+        {
+          "attended": true,
+          "rating": 1655.3,
+          "ranking": 4400,
+          "problemsSolved": 2,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 5100,
+          "contest": {
+            "titleSlug": "weekly-contest-506"
+          }
+        }
+      ],
+      "current_rating": 1655.3,
+      "contest": "weekly-contest-500",
+      "rank": 3100,
+      "expected": {
+        "features": [
+          1500.0,
+          3100.0,
+          10000.0,
+          31.0,
+          0.0,
+          0.5,
+          3000.0,
+          0.5,
+          3000.0,
+          0.0,
+          1500.0,
+          8.03947991910045,
+          465.0,
+          750.0,
+          0.5555555555555556
+        ],
+        "rating_before": 1500.0,
+        "prediction": 59.1328125,
+        "actual_change": 21.40000000000009
+      }
+    },
+    {
+      "name": "first contest, no history",
+      "history": [],
+      "current_rating": 1500.0,
+      "contest": "weekly-contest-530",
+      "rank": 8000,
+      "expected": {
+        "features": [
+          1500.0,
+          8000.0,
+          12000.0,
+          66.66666666666667,
+          0.0,
+          0.5,
+          3000.0,
+          0.5,
+          3000.0,
+          0.0,
+          1500.0,
+          8.987321812850125,
+          1000.0,
+          750.0,
+          0.5555555555555556
+        ],
+        "rating_before": 1500.0,
+        "prediction": -3.5515778064727783,
+        "actual_change": null
+      }
+    },
+    {
+      "name": "only an unranked placeholder",
+      "history": [
+        {
+          "attended": true,
+          "rating": 1500.0,
+          "ranking": 0,
+          "problemsSolved": 0,
+          "totalProblems": 4,
+          "finishTimeInSeconds": 0,
+          "contest": {
+            "titleSlug": "weekly-contest-529"
+          }
+        }
+      ],
+      "current_rating": 1500.0,
+      "contest": "weekly-contest-530",
+      "rank": 2500,
+      "expected": {
+        "features": [
+          1500.0,
+          2500.0,
+          10000.0,
+          25.0,
+          1.0,
+          0.5,
+          3000.0,
+          0.5,
+          3000.0,
+          0.0,
+          1500.0,
+          7.824445930877619,
+          375.0,
+          750.0,
+          0.5555555555555556
+        ],
+        "rating_before": 1500.0,
+        "prediction": 61.640281677246094,
+        "actual_change": null
+      }
+    }
+  ]
+}

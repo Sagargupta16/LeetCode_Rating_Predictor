@@ -14,12 +14,15 @@ import argparse
 import json
 import logging
 import os
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
 from tqdm import tqdm
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -55,20 +58,17 @@ DEFAULT_MIN_RETENTION = 0.95
 # which capped out at 197,991 records against the 244,950 already committed and
 # tripped the retention floor on a completely healthy run.
 #
-# The ceiling is GitHub's 100 MB per-file hard limit, since data/data.json is
-# committed. At ~231 bytes per record and ~8.4 KB per contributing user that cap
-# sits near 18,300 attempts, and fetching all 43,158 usernames would produce
-# roughly 307 MB, which cannot be pushed at all.
+# The records now go to the Hugging Face Hub as Parquet (scripts/export_dataset.py)
+# instead of being committed, so GitHub's 100 MB file limit no longer caps this:
+# 12,000 users come to 15.3 MB of Parquet and all 43,158 to roughly 55 MB.
 #
-#   attempts   contributors   records    size
-#      8,000          5,460   197,991   43.7 MB   under the committed dataset
-#     10,000          6,825   247,489   54.6 MB   clears it by only 1%
-#     12,000          8,190   296,986   65.5 MB   21% headroom  <- chosen
-#     14,000          9,555   346,484   76.4 MB   nearing the 90 MB warning
+#   attempts   contributors   records
+#      8,000          5,460   197,991   under the 2026-09 dataset
+#     12,000          8,190   296,986   current  <- chosen
 #
-# 12,000 leaves enough headroom above the retention floor that ordinary variance
-# does not abort the run. Re-derive these numbers from a real run before raising
-# it, and check the logged file size.
+# Raising it fetches proportionally more from LeetCode, and scripts/backtest.py
+# samples its unseen users from everything past this index, so leave a few
+# thousand usernames after it.
 DEFAULT_MAX_USERS = 12000
 GRAPHQL_QUERY = """
 query userContestRankingInfo($username: String!) {
@@ -226,6 +226,9 @@ def process_user_data(username: str, session) -> list | None:
 
         record = _build_record(rating, rank, idx, solve_rates, finish_times, ratings)
         record["output"] = round(new_rating - rating, 4)
+        info = contest.get("contest") or {}
+        record["contest"] = info.get("title")
+        record["start_time"] = info.get("startTime")
         data.append(record)
 
         rating = new_rating
@@ -251,6 +254,25 @@ def write_records(path: Path, records: list[dict]) -> None:
         for record in records:
             f.write(json.dumps(record) + "\n")
     os.replace(tmp, path)
+
+
+def baseline_count(baseline: str, output_file: Path) -> tuple[int, str]:
+    """Records the retention check compares a new run against, and where."""
+    if baseline == "file":
+        return count_records(output_file), "on disk"
+
+    from huggingface_hub.errors import RepositoryNotFoundError
+
+    sys.path.insert(0, str(REPO_ROOT))
+    from scripts.export_dataset import hub_row_count
+
+    try:
+        return hub_row_count(), "on the Hub"
+    except (RepositoryNotFoundError, FileNotFoundError):
+        # First publish, or no access: nothing to compare with. The upload
+        # step needs the same access, so a bad token still fails the job.
+        logger.warning("No published dataset to compare with; skipping the check")
+        return 0, "on the Hub"
 
 
 def load_usernames(path: Path) -> list[str] | None:
@@ -317,7 +339,14 @@ def collect_records(
                 finally:
                     pbar.update(1)
 
-    all_data = [record for name in usernames for record in by_user.get(name, [])]
+    # An anonymous id per contributing user, in usernames order, so the Hub
+    # dataset can split by user without the rating-chain heuristic.
+    all_data = []
+    contributors = (by_user[name] for name in usernames if name in by_user)
+    for user_id, records in enumerate(contributors):
+        for record in records:
+            record["user_id"] = user_id
+        all_data.extend(records)
     return all_data, tally
 
 
@@ -350,6 +379,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Write the new dataset even if it fails the retention check",
     )
+    parser.add_argument(
+        "--baseline",
+        choices=["file", "hub"],
+        default="file",
+        help=(
+            "What the retention check compares against: the local data.json "
+            "(default) or the published Hub dataset, which is what CI uses now "
+            "that data.json is not committed"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -381,10 +420,12 @@ def main() -> int:
         return 1
 
     output_file = data_dir / "data.json"
-    existing = count_records(output_file)
+    existing, where = baseline_count(args.baseline, output_file)
     retained = len(all_data) / existing if existing else 1.0
     if existing:
-        logger.info(f"Existing records: {existing} (this run keeps {retained:.1%})")
+        logger.info(
+            f"Existing records ({where}): {existing} (this run keeps {retained:.1%})"
+        )
     if retained < args.min_retention and not args.force:
         # Name the actual cause. Blaming throttling on a run with zero failures
         # sends you chasing the wrong thing, which is exactly what the previous
@@ -401,13 +442,13 @@ def main() -> int:
                 f"No fetches failed, so this was a healthy run and throttling is "
                 f"not the cause. {tally['successful']} of {len(usernames)} users "
                 f"contributed records and {tally['empty']} have no contest "
-                "history, so --users is simply too low to reach the committed "
+                "history, so --users is simply too low to reach the published "
                 "record count. Raise --users (or DEFAULT_MAX_USERS) rather than "
                 "lowering the floor."
             )
         logger.error(
             f"Refusing to overwrite {output_file}: {len(all_data)} new records "
-            f"against {existing} on disk ({retained:.1%}, under the "
+            f"against {existing} {where} ({retained:.1%}, under the "
             f"{args.min_retention:.0%} floor). {cause} Pass --force only if the "
             "shrink is genuinely intended."
         )
@@ -416,11 +457,6 @@ def main() -> int:
     write_records(output_file, all_data)
     size_mb = output_file.stat().st_size / 1024 / 1024
     logger.info(f"\nTraining data saved to {output_file} ({size_mb:.1f} MB)")
-    if size_mb > 90:
-        logger.warning(
-            f"{output_file.name} is {size_mb:.1f} MB, near GitHub's 100 MB "
-            "per-file hard limit. Lower --users before this becomes unpushable."
-        )
     logger.info("=" * 60)
     return 0
 

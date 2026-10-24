@@ -1,6 +1,6 @@
 [project]
 name = "leetcode-rating-predictor"
-version = "2.5.0"
+version = "2.6.0"
 description = "Neural network LeetCode contest rating predictor (FastAPI + NumPy inference)"
 requires-python = ">=3.12"
 license = "MIT"
@@ -26,11 +26,14 @@ ml = [
     "keras==3.15.1",
     "scikit-learn==1.9.1",
     "joblib==1.6.0",
+    "huggingface-hub==2.3.0",
+    "pyarrow==26.0.0",
 ]
 
 # Mirrors requirements-dev.txt. uv sync installs this group by default, so CI
-# can provision lint and test tooling straight from uv.lock. requests and tqdm
-# are only imported by scripts/ (data refresh, backtest), never by the API.
+# can provision lint and test tooling straight from uv.lock. requests, tqdm,
+# huggingface-hub and pyarrow are only imported by scripts/ (data refresh, Hub
+# publishing, backtest), never by the API.
 [dependency-groups]
 dev = [
     "black==26.10.1",
@@ -41,6 +44,8 @@ dev = [
     "pytest-asyncio==1.4.0",
     "requests==2.34.2",
     "tqdm==4.70.1",
+    "huggingface-hub==2.3.0",
+    "pyarrow==26.0.0",
 ]
 
 [build-system]

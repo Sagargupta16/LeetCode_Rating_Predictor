@@ -19,6 +19,27 @@ DEFAULT_SOLVE_RATE = 0.5
 DEFAULT_FINISH_TIME = 3000.0
 CONTEST_SECONDS = 5400
 
+# Names for f1..f15, in model input order. The Hub dataset uses them as column
+# names and models/model.json lists them, so the browser extension can check it
+# builds the same vector.
+FEATURE_NAMES = (
+    "rating_before",
+    "rank",
+    "participants",
+    "rank_percent",
+    "contest_index",
+    "avg_solve_rate",
+    "avg_finish_time",
+    "recent_solve_rate",
+    "recent_finish_time",
+    "rating_trend",
+    "max_rating",
+    "log_rank",
+    "rating_x_rank_share",
+    "solve_rate_x_rating",
+    "finish_time_share",
+)
+
 
 def _avg(values, default):
     return sum(values) / len(values) if values else default

@@ -15,30 +15,28 @@ h1 {
   font-size: 18px;
 }
 
-label {
-  display: block;
-  margin: 16px 0 6px;
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 16px 0 0;
+}
+
+dt {
   font-weight: 600;
 }
 
-input {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: #141414;
-  color: inherit;
-  font: inherit;
+dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-input:focus {
-  outline: 2px solid #3b82f6;
-  outline-offset: 1px;
+a {
+  color: #60a5fa;
 }
 
 .hint {
-  margin: 6px 0 0;
+  margin: 14px 0 0;
   color: #a3a3a3;
 }
 
@@ -64,7 +62,17 @@ button:hover {
   border-color: #3b82f6;
 }
 
-button[type="submit"] {
+button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+#refresh {
   background: #2563eb;
   border-color: #2563eb;
   color: #fff;

@@ -1,5 +1,5 @@
-# Dev tools for linting, formatting and testing, plus the HTTP and progress-bar
-# libraries scripts/ uses (the API itself needs neither)
+# Dev tools for linting, formatting and testing, plus what scripts/ needs to
+# fetch data and publish to the Hugging Face Hub (the API itself needs none)
 black==26.10.1
 ruff==0.16.10
 isort==8.0.1
@@ -8,3 +8,5 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 requests==2.34.2
 tqdm==4.70.1
+huggingface-hub==2.3.0
+pyarrow==26.0.0

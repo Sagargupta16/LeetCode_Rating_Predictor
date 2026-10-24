@@ -19,8 +19,10 @@ the current model before replacing it:
 
 ```bash
 pip install -r requirements-ml.txt
-python scripts/train.py --loss huber    # writes model.keras, scaler.save, models/metrics.json
+python scripts/train.py --loss huber    # Hub dataset; writes model.keras, scaler.save, models/metrics.json
 python scripts/export_model.py
+python scripts/publish_model.py        # models/model.json, what the extension runs
+python scripts/make_parity_fixture.py  # the Python outputs the extension is tested against
 python scripts/backtest.py --cache   # new model
 python scripts/backtest.py --cache \
   --weights .cache/old/weights.npz --scaler .cache/old/scaler.json   # previous model, same users
@@ -32,7 +34,13 @@ python scripts/backtest.py --cache \
 the new model; `--weights` and `--scaler` must name a file under `models/` or
 `.cache/`.
 Only ship a model that wins on the backtest, and commit the regenerated
-artifacts and `models/metrics.json` together.
+artifacts, `models/model.json`, `models/metrics.json` and
+`tests/fixtures/extension_parity.json` together. Then publish it with
+`python scripts/publish_model.py --upload` (needs `hf auth login` with write
+access); installed extensions pick it up within a day.
+
+The training records live in the Hub dataset `sagargupta16/leetcode-contest-rating-changes`,
+which the weekly refresh updates; `train.py` reads it by default.
 
 `tests/test_model_artifacts.py` pins the prediction for a fixed input. A
 legitimate retrain will change it -- update `GOLDEN_PREDICTION` alongside the new
@@ -52,14 +60,14 @@ pre-commit install
 ## Testing
 
 ```bash
-# Backend (68 tests)
+# Backend (72 tests)
 python -m pytest tests/
 
 # Frontend (19 tests)
 cd client && npm test
 
-# Browser extension helpers (8 tests)
-node --test extension/core.test.js
+# Browser extension (17 tests, including the parity check against Python)
+cd extension && node --test
 ```
 
 All tests must pass before submitting a PR.
@@ -67,7 +75,9 @@ All tests must pass before submitting a PR.
 ## Dependencies
 
 Human-editable pins live in `requirements.txt` (runtime), `requirements-ml.txt`
-(TensorFlow/Keras) and `requirements-dev.txt` (tooling). `pyproject.toml`
+(TensorFlow/Keras, plus the Hub client to read the dataset) and
+`requirements-dev.txt` (tooling, and what `scripts/` needs to fetch data and
+publish to the Hub). `pyproject.toml`
 mirrors them so `uv.lock` can resolve the full tree.
 
 `requirements.lock.txt` and `requirements-ml.lock.txt` are generated and carry
