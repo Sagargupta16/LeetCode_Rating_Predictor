@@ -22,9 +22,9 @@
     "@testing-library/user-event": "^14.6.3",
     "@vitejs/plugin-react": "^6.0.5",
     "jsdom": "^30.0.1",
-    "msw": "^2.15.0",
+    "msw": "^3.0.0",
     "prettier": "^3.9.6",
     "vite": "^8.2.1",
-    "vitest": "^4.1.12"
+    "vitest": "^5.0.0"
   }
 }
