@@ -4,9 +4,9 @@
 # No ML framework here on purpose: inference runs on numpy against the exported
 # artifacts in models/. TensorFlow, Keras, scikit-learn and joblib are only
 # needed to train and export, and live in requirements-ml.txt.
-fastapi==0.142.2
-pydantic==2.13.5
-numpy==2.5.3
+fastapi==0.162.0
+pydantic==2.14.2
+numpy==2.5.4
 uvicorn[standard]==0.54.0
 httpx==0.28.1
 redis==8.1.0
