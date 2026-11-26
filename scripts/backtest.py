@@ -30,7 +30,9 @@ import math
 import statistics
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from itertools import islice
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +46,10 @@ from scripts.update_data import (  # noqa: E402
     build_session,
     fetch_user_contest_history,
 )
+
+# Fetches in flight ahead of the scoring loop: the --workers default that
+# scripts/update_data.py fetches the training users with in the same job.
+FETCH_WORKERS = 10
 
 HISTORY_QUERY = """
 query userContestRankingInfo($username: String!) {
@@ -209,34 +215,51 @@ def save_histories(histories):
 
 
 def score_pool(pool, args, model, scaler, since_ts, cached):
-    """Replay users from the shuffled pool until ``args.users`` have scored."""
+    """Replay users from the shuffled pool until ``args.users`` have scored.
+
+    Users missing from ``cached`` are fetched up to ``FETCH_WORKERS`` ahead of
+    the loop, but every result is used in pool order, so the users scored, the
+    progress lines and the stop are the same as fetching one user at a time.
+    """
     session = build_session()
     errors, actuals, predictions = [], [], []
     tally = {"users": 0, "skipped": 0, "failed": 0}
-    for username in pool:
-        if tally["users"] >= args.users:
-            break
-        history = cached.get(username)
-        if history is None:
-            history = fetch_user_contest_history(session, username, HISTORY_QUERY)
-            time.sleep(args.delay)
-        if history is None:
-            tally["failed"] += 1
-            continue
-        cached[username] = history
-        rows = list(replay_user(history, args.last, since_ts, model, scaler))
-        if not rows:
-            tally["skipped"] += 1
-            continue
-        tally["users"] += 1
-        for _, predicted, actual in rows:
-            errors.append(predicted - actual)
-            actuals.append(actual)
-            predictions.append(predicted)
-        print(
-            f"[{tally['users']}/{args.users}] {username}: {len(rows)} contests",
-            file=sys.stderr,
-        )
+
+    def fetch(username):
+        history = fetch_user_contest_history(session, username, HISTORY_QUERY)
+        time.sleep(args.delay)
+        return history
+
+    # Lazy, so a user is checked against the cache only as it is queued.
+    uncached = ((i, name) for i, name in enumerate(pool) if cached.get(name) is None)
+    fetches = {}
+    with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as executor:
+        for index, username in enumerate(pool):
+            if tally["users"] >= args.users:
+                break
+            for i, name in islice(uncached, FETCH_WORKERS - len(fetches)):
+                fetches[i] = executor.submit(fetch, name)
+            future = fetches.pop(index, None)
+            history = cached.get(username)
+            if history is None:
+                history = future.result()
+            if history is None:
+                tally["failed"] += 1
+                continue
+            cached[username] = history
+            rows = list(replay_user(history, args.last, since_ts, model, scaler))
+            if not rows:
+                tally["skipped"] += 1
+                continue
+            tally["users"] += 1
+            for _, predicted, actual in rows:
+                errors.append(predicted - actual)
+                actuals.append(actual)
+                predictions.append(predicted)
+            print(
+                f"[{tally['users']}/{args.users}] {username}: {len(rows)} contests",
+                file=sys.stderr,
+            )
     return errors, actuals, predictions, tally
 
 

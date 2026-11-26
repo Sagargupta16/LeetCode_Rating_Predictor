@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.6.1] - 2026-11-26
+
+### Changed
+
+- `scripts/backtest.py` fetches up to 10 uncached users ahead of the scoring
+  loop (the 10 workers `scripts/update_data.py` uses) instead of one at a time,
+  and `--delay` is now each worker's pause after a fetch. Results are still used
+  in pool order, so the users scored, the progress lines, the stop at the 50th
+  scoring user and the report are unchanged; at most 9 users past the stop are
+  fetched and dropped. The weekly refresh's backtest step spent 422 s on 917
+  serial fetches; on a stubbed fetch with the same latency (0.16 s mean) and
+  the 0.3 s delay, 989 fetches took 458.5 s one at a time and 49.7 s now.
+
 ## [2.6.0] - 2026-10-24
 
 ### Added
